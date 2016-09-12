@@ -116,7 +116,7 @@ def calc_LMS_pub(h, ID, OTSpubkeys):
             siblings = ""
             for k in (1, 2):
                siblings = D.pop()+siblings
-               print "Child value popped from data stack."
+               print "Child value popped from data stack."     #debug
                level = I.pop()
                print "I = ",I     # debug
             TMP.update(siblings)
@@ -174,15 +174,4 @@ LMS_pubkey = calc_LMS_pub(h, ID, OTSpubkeys)
 
 Byteprint("\nLMS public key: ",LMS_pubkey)
 
-''' ---------- First attempt at Merkle tree computation ----------
-T = []
-for r in xrange(1, (2**h)+(2**h-1)):
-   print r
-   if(r <= 2**h):
-      T.append(SHA256(OTSpubkey[2**h-r]+I+bytstr(r,4)+D_LEAF).digest())
-   else:
-      T.append(SHA256(T[r//2-(2**h/2)]+T[r//2-(2**h/2)+1]+I+bytstr(r,4)+D_INTR).digest())
 
-for r in xrange(0, (2**h)+(2**h-1)):
-   Byteprint("\nT["+str(r)+"]: ", T[r])
-    ---------- First attempt at Merkle tree computation ----------'''
