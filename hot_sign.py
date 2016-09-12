@@ -132,7 +132,7 @@ def calc_LMS_pub(h, ID, OTSpubkeys):
 
 
 
-# MAIN PROGRAM
+# ===== BEGIN MAIN PROGRAM =====
 
 # Signature inputs
 
@@ -174,4 +174,4 @@ LMS_pubkey = calc_LMS_pub(h, ID, OTSpubkeys)
 
 Byteprint("\nLMS public key: ",LMS_pubkey)
 
-
+# ===== END MAIN PROGRAM =====
