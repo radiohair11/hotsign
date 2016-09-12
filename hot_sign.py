@@ -27,7 +27,7 @@ from LMOTS_SHA256_N32_W4 import *
 
 
 def Byteprint(caption, hexstr, linelen=16):
-   '''Byteprint pretty prints hex strings with leading caption'''
+   '''Pretty print hex strings with leading caption.'''
    lines = int(math.ceil(len(hexstr)/float(linelen)))
    print caption
    for i in range (0, lines):
@@ -35,40 +35,37 @@ def Byteprint(caption, hexstr, linelen=16):
       end = i*linelen+linelen
       print "   ",' '.join(x.encode('hex')for x in hexstr[start:end])
 
+
 def bytstr(x, bytlen=4):
-  '''bytstr returns the binary rep'n of x in bytlen bytes with 0s prefixed'''
-  bits = binascii.a2b_hex('{:064x}'.format(x))
-  return bits[-bytlen:]
+   '''Return the binary rep'n of x in bytlen bytes with 0s prefixed.'''
+   bits = binascii.a2b_hex('{:064x}'.format(x))
+   return bits[-bytlen:]
+
 
 def calc_p(n, w):
-  ''' calc the number of w-bit substrings in the message hash + checksum'''
-  u = math.ceil(8 * n / w)
-  v = math.ceil((math.floor(math.log((2**w - 1) * u, 2)) + 1) / w)
-  p = u+v
-  return int(p)
+   '''Calculate the number of w-bit substrings in the message hash + checksum.'''
+   u = math.ceil(8 * n / w)
+   v = math.ceil((math.floor(math.log((2**w - 1) * u, 2)) + 1) / w)
+   p = u+v
+   return int(p)
+
 
 def calc_ls(n, w, sum):
-  '''Calc number of left shift bits for checksum'''
-  u = math.ceil(8 * n / w)
-  v = math.ceil((math.floor(math.log((2**w - 1) * u, 2)) + 1) / w)
-  shftl = sum - (v*w)
-  return int(shftl)
+   '''Calc number of left shift bits for checksum'''
+   u = math.ceil(8 * n / w)
+   v = math.ceil((math.floor(math.log((2**w - 1) * u, 2)) + 1) / w)
+   shftl = sum - (v*w)
+   return int(shftl)
 
-# Generate LMS private key
-
-'''
-LMSprvkey = random.getrandbits(256)
-Byteprint("LMS private key: ", bytstr(LMSprvkey, n*8))
-print " "
-'''
 
 def calc_LMOTSpubkey(LMSprvkey, ID, q):
+   '''Calculate one LMOTS public key from the LMS private key (seed).'''
 
    # Generate LMOTS seed
 
    string = "LMOTS"+bytstr(0,1)+ID+bytstr(q,4)+bytstr(n*8,2)
    OTSprvseed = HMAC.new(LMSprvkey, string, SHA256).digest()
-   Byteprint("\nLMOTS seed: ", OTSprvseed)
+   Byteprint("\nLMOTS seed: ", OTSprvseed)     # debug
 
    # Generate LMOTS private key
 
@@ -78,7 +75,7 @@ def calc_LMOTSpubkey(LMSprvkey, ID, q):
    for i in xrange(0, p):
      string = bytstr(i,4)+"LMS"+bytstr(0,1)+ID+bytstr(q,4)+bytstr(n*8,2)
      LMOTSprvkey.append(SHA256(OTSprvseed+string).digest())
-     Byteprint("\nX["+str(i)+"] = ", LMOTSprvkey[i])
+     Byteprint("\nX["+str(i)+"] = ", LMOTSprvkey[i])     # debug
 
    # Generate LMOTS public key
 
@@ -98,30 +95,39 @@ def calc_LMOTSpubkey(LMSprvkey, ID, q):
 
 
 def calc_LMS_pub(h, ID, OTSpubkeys):
+   '''Calculate the LMS public key from a set of leaf node values.'''
 
    D = []   # data stack
    I = []   # integer stack
 
-   for i in xrange(0, 2**(h-1), 2):
+   for i in xrange(0, 2**h, 2):
+      print "i = ",i     # debug
       level = 0
       for j in xrange(0, 2):
+         print "j = ",j     # debug
          r = i+j+1
          D.append(SHA256(OTSpubkeys[i+j]+ID+bytstr(r)+D_LEAF).digest())
+         print "   Leaf ",i+j," pushed onto data stack."     #debug
          I.append(level)
-         print I, len(I)
+         print "j loop: I, len(I) = ",I, len(I)     # debug
       while len(I) >= 2:
          if I[-2] == I[-1]:
             TMP = SHA256()
             siblings = ""
             for k in (1, 2):
                siblings = D.pop()+siblings
+               print "Child value popped from data stack."
                level = I.pop()
-               print level
+               print "I = ",I     # debug
             TMP.update(siblings)
             r = r + 1
             TMP.update(ID+bytstr(r)+D_INTR)
             D.append(TMP.digest())
+            print "Two child values hashed and pushed on data stack."     # debug
             I.append(level+1)
+            print "while loop: I, len(I) = ", I, len(I)     # debug
+         else:
+            break
    return D.pop()
 
 
@@ -166,6 +172,7 @@ for i in xrange(0, 2**h):
 
 LMS_pubkey = calc_LMS_pub(h, ID, OTSpubkeys)
 
+Byteprint("\nLMS public key: ",LMS_pubkey)
 
 ''' ---------- First attempt at Merkle tree computation ----------
 T = []
