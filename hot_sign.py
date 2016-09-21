@@ -36,9 +36,9 @@ def Byteprint(caption, hexstr, linelen=16):
       print "   ",' '.join(x.encode('hex')for x in hexstr[start:end])
 
 
-def bytstr(x, bytlen=4):
-   '''Return the binary rep'n of x in bytlen bytes with 0s prefixed.'''
-   bits = binascii.a2b_hex('{:064x}'.format(x))
+def bytstr(num, bytlen=4):
+   '''Return the binary rep'n of num in bytlen bytes with 0s prefixed.'''
+   bits = binascii.a2b_hex('{0:064x}'.format(num))
    return bits[-bytlen:]
 
 
