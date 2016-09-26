@@ -23,8 +23,6 @@ import hmac as HMAC
 import binascii
 
 # import LMS_func  -- not sure how handy this is yet
-from LMOTS_SHA256_N32_W4 import *
-
 
 def Byteprint(caption, hexstr, linelen=16):
    '''Pretty print hex strings with leading caption.'''
@@ -58,36 +56,41 @@ def calc_ls(n, w, sum):
    return int(shftl)
 
 
-def calc_LMOTSpubkey(LMSprvkey, ID, q):
+def calc_LMOTSpubkey(LMSprvkey, ID, n, w, MNUM):
    '''Calculate one LMOTS public key from the LMS private key (seed).'''
 
-   # Generate LMOTS seed
+   D_ITER = '\x00'
+   D_PBLC = '\x01'
 
-   string = "LMOTS"+bytstr(0,1)+ID+bytstr(q,4)+bytstr(n*8,2)
+   # Generate per-message LMOTS seed from LMS private key
+
+   string = "LMOTS"+bytstr(0,1)+ID+bytstr(MNUM,4)+bytstr(n*8,2)
    OTSprvseed = HMAC.new(LMSprvkey, string, SHA256).digest()
    Byteprint("\nLMOTS seed: ", OTSprvseed)     # debug
 
-   # Generate LMOTS private key
+   # Generate per-message p-element LMOTS private key
 
    p = calc_p(n, w)
 
    LMOTSprvkey = []
    for i in xrange(0, p):
-     string = bytstr(i,4)+"LMS"+bytstr(0,1)+ID+bytstr(q,4)+bytstr(n*8,2)
+     string = bytstr(i,4)+"LMS"+bytstr(0,1)+ID+bytstr(MNUM,4)+bytstr(n*8,2)
      LMOTSprvkey.append(SHA256(OTSprvseed+string).digest())
      Byteprint("\nX["+str(i)+"] = ", LMOTSprvkey[i])     # debug
 
-   # Generate LMOTS public key
+   # Generate per-message p-element LMOTS public key vector
 
    y = []
    for i in xrange(0, p):
      tmp = LMOTSprvkey[i]
      for j in xrange(0, 2**w-1):
-       tmp = SHA256(tmp+ID+bytstr(q,4)+bytstr(i,2)+bytstr(j,2)+D_ITER).digest()
+       tmp = SHA256(tmp+ID+bytstr(MNUM,4)+bytstr(i,2)+bytstr(j,2)+D_ITER).digest()
      y.append(tmp)
 
+   # Generate per-message n-byte LMOTS public key
+
    Y = SHA256()
-   Y.update(ID+bytstr(q,4))
+   Y.update(ID+bytstr(MNUM,4))
    for i in xrange(0, p):
      Y.update(y[i])
    Y.update(D_PBLC)
@@ -95,18 +98,22 @@ def calc_LMOTSpubkey(LMSprvkey, ID, q):
 
 
 def calc_LMS_pub(h, ID, OTSpubkeys):
-   '''Calculate the LMS public key from a set of leaf node values.'''
+   '''Calculate the n-byte LMS public key from a set n-byte LMOTS public keys.
+         NODN: the Merkle tree node number (label), 1 to 2(h+1)-1 '''
+
+   D_LEAF = '\x03'
+   D_INTR = '\x04'
 
    D = []   # data stack
    I = []   # integer stack
 
+
    for i in xrange(0, 2**h, 2):
-      print "i = ",i     # debug
       level = 0
       for j in xrange(0, 2):
-         print "j = ",j     # debug
-         r = i+j+1
-         D.append(SHA256(OTSpubkeys[i+j]+ID+bytstr(r)+D_LEAF).digest())
+         NODN = 2**h+i+j
+         print "\ni = ", i,"j = ",j,"Leaf node number = ", NODN     # debug
+         D.append(SHA256(OTSpubkeys[i+j]+ID+bytstr(NODN)+D_LEAF).digest())
          print "   Leaf ",i+j," pushed onto data stack."     #debug
          I.append(level)
          print "j loop: I, len(I) = ",I, len(I)     # debug
@@ -118,10 +125,11 @@ def calc_LMS_pub(h, ID, OTSpubkeys):
                siblings = D.pop()+siblings
                print "Child value popped from data stack."     #debug
                level = I.pop()
-               print "I = ",I     # debug
+               print "I = ",I, "level = ", level     # debug
             TMP.update(siblings)
-            r = r + 1
-            TMP.update(ID+bytstr(r)+D_INTR)
+            NODN = (2**h+i)/(2**(level+1))
+            print "Tree node number: ", NODN     # debug
+            TMP.update(ID+bytstr(NODN)+D_INTR)
             D.append(TMP.digest())
             print "Two child values hashed and pushed on data stack."     # debug
             I.append(level+1)
@@ -134,11 +142,13 @@ def calc_LMS_pub(h, ID, OTSpubkeys):
 
 # ===== BEGIN MAIN PROGRAM =====
 
+from LMOTS_SHA256_N32_W4 import *
+
 # Signature inputs
 
-ID = "LMS_SHA256_N32_W4_H5\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e"
-q = 6 # message number
-h = 4 # height (num of levels - 1) of tree
+LMID = "LMS_SHA256_N32_W4_H5\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e"
+MNUM = 6 # message number (q)
+h = 4 # height (num of levels - 1) of tree; NUMS = 2^h
 
 
 # Read LMS private key from storage
@@ -160,7 +170,7 @@ for i in range (0, 2):
 OTSpubkeys = []
 
 for i in xrange(0, 2**h):
-  OTSpubkeys.append(calc_LMOTSpubkey(LMSprvkey, ID, i))
+  OTSpubkeys.append(calc_LMOTSpubkey(LMSprvkey, LMID, n, w, i))
 
 #---------- Print statements for debug ----------
 for i in xrange(0, 2**h):
@@ -170,7 +180,7 @@ for i in xrange(0, 2**h):
 
 # Generate LMS public key (calc hash tree)
 
-LMS_pubkey = calc_LMS_pub(h, ID, OTSpubkeys)
+LMS_pubkey = calc_LMS_pub(h, LMID, OTSpubkeys)
 
 Byteprint("\nLMS public key: ",LMS_pubkey)
 
