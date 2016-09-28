@@ -48,15 +48,35 @@ def calc_p(n, w):
    return int(p)
 
 
-def calc_ls(n, w, sum):
+def calc_ls(n, w, sumbits):
    '''Calc number of left shift bits for checksum'''
    u = math.ceil(8 * n / w)
    v = math.ceil((math.floor(math.log((2**w - 1) * u, 2)) + 1) / w)
-   shftl = sum - (v*w)
+   shftl = sumbits - (v*w)
    return int(shftl)
 
+def calc_LMOTSprvkey(LMSprvkey, LMID, n, MPRT, MNUM):
+   '''Calculate one LMOTS private key (list) from the LMS private key (seed)'''
 
-def calc_LMOTSpubkey(LMSprvkey, ID, n, w, MNUM):
+   # Generate per-message LMOTS seed from LMS private key
+
+   string = "LMOTS"+bytstr(0,1)+LMID+bytstr(MNUM,4)+bytstr(n*8,2)
+   OTSprvseed = HMAC.new(LMSprvkey, string, SHA256).digest()
+   Byteprint("\nLMOTS seed: ", OTSprvseed)     # debug
+
+   # Generate per-message p-element LMOTS private key
+
+   LMOTSprvkey = []
+   for i in xrange(0, MPRT):
+     string = bytstr(i,4)+"LMS"+bytstr(0,1)+LMID+bytstr(MNUM,4)+bytstr(n*8,2)
+     LMOTSprvkey.append(SHA256(OTSprvseed+string).digest())
+     Byteprint("\nX["+str(i)+"] = ", LMOTSprvkey[i])     # debug
+
+   return LMOTSprvkey
+
+
+
+def calc_LMOTSpubkey(LMSprvkey, LMID, n, w, MNUM):
    '''Calculate one LMOTS public key from the LMS private key (seed).'''
 
    D_ITER = '\x00'
@@ -64,42 +84,30 @@ def calc_LMOTSpubkey(LMSprvkey, ID, n, w, MNUM):
 
    # Generate per-message LMOTS seed from LMS private key
 
-   string = "LMOTS"+bytstr(0,1)+ID+bytstr(MNUM,4)+bytstr(n*8,2)
-   OTSprvseed = HMAC.new(LMSprvkey, string, SHA256).digest()
-   Byteprint("\nLMOTS seed: ", OTSprvseed)     # debug
-
-   # Generate per-message p-element LMOTS private key
-
-   p = calc_p(n, w)
-
-   LMOTSprvkey = []
-   for i in xrange(0, p):
-     string = bytstr(i,4)+"LMS"+bytstr(0,1)+ID+bytstr(MNUM,4)+bytstr(n*8,2)
-     LMOTSprvkey.append(SHA256(OTSprvseed+string).digest())
-     Byteprint("\nX["+str(i)+"] = ", LMOTSprvkey[i])     # debug
+   MPRT = calc_p(n, w)
+   LMOTSprvkey = calc_LMOTSprvkey(LMSprvkey, LMID, n, MPRT, MNUM)
 
    # Generate per-message p-element LMOTS public key vector
 
    y = []
-   for i in xrange(0, p):
+   for i in xrange(0, MPRT):
      tmp = LMOTSprvkey[i]
      for j in xrange(0, 2**w-1):
-       tmp = SHA256(tmp+ID+bytstr(MNUM,4)+bytstr(i,2)+bytstr(j,2)+D_ITER).digest()
+       tmp = SHA256(tmp+LMID+bytstr(MNUM,4)+bytstr(i,2)+bytstr(j,2)+D_ITER).digest()
      y.append(tmp)
 
    # Generate per-message n-byte LMOTS public key
 
    Y = SHA256()
-   Y.update(ID+bytstr(MNUM,4))
-   for i in xrange(0, p):
+   Y.update(LMID+bytstr(MNUM,4))
+   for i in xrange(0, MPRT):
      Y.update(y[i])
    Y.update(D_PBLC)
    return Y.digest()
 
 
-def calc_LMS_pub(h, ID, OTSpubkeys):
-   '''Calculate the n-byte LMS public key from a set n-byte LMOTS public keys.
-         NODN: the Merkle tree node number (label), 1 to 2(h+1)-1 '''
+def calc_LMS_pub(h, LMID, OTSpubkeys):
+   '''Calculate the n-byte LMS public key from a set n-byte LMOTS public keys.'''
 
    D_LEAF = '\x03'
    D_INTR = '\x04'
@@ -113,7 +121,7 @@ def calc_LMS_pub(h, ID, OTSpubkeys):
       for j in xrange(0, 2):
          NODN = 2**h+i+j
          print "\ni = ", i,"j = ",j,"Leaf node number = ", NODN     # debug
-         D.append(SHA256(OTSpubkeys[i+j]+ID+bytstr(NODN)+D_LEAF).digest())
+         D.append(SHA256(OTSpubkeys[i+j]+LMID+bytstr(NODN)+D_LEAF).digest())
          print "   Leaf ",i+j," pushed onto data stack."     #debug
          I.append(level)
          print "j loop: I, len(I) = ",I, len(I)     # debug
@@ -129,7 +137,7 @@ def calc_LMS_pub(h, ID, OTSpubkeys):
             TMP.update(siblings)
             NODN = (2**h+i)/(2**(level+1))
             print "Tree node number: ", NODN     # debug
-            TMP.update(ID+bytstr(NODN)+D_INTR)
+            TMP.update(LMID+bytstr(NODN)+D_INTR)
             D.append(TMP.digest())
             print "Two child values hashed and pushed on data stack."     # debug
             I.append(level+1)
@@ -139,6 +147,48 @@ def calc_LMS_pub(h, ID, OTSpubkeys):
    return D.pop()
 
 
+def coef(bitstring, index, w):
+   MASK = bytstr(2**w-1, 32)
+   NBYT = int(math.floor(index*w/8))
+   Byteprint("\nbitstring = ",bitstring)
+   OPND = bitstring[NBYT:NBYT+8]
+   Byteprint("\nOPND = ", OPND)
+   RSFT = 8 - (w*(i%(8/w))+w)
+   return MASK&(OPND>>RSFT)
+
+
+def cksm(MHSH, n, w):
+   '''Calculate checksum (section 4.6)'''
+   csum = 0
+   u = int(math.ceil(8 * n / w))
+   for i in xrange(0, u):
+      csum = csum + (2**w-1) - coef(MHSH, i, w)
+   return csum<<calc_ls(n, w, 16)
+
+
+def LMS_calc_sig(message, LMSprvkey, LMID, MNUM):
+
+   D_ITER = '\x00'
+   D_MESG = '\x02'
+   MPRT = calc_p(n, w)
+   TYPE = typecode
+  
+#   C = bytstr(random.getrandbits(256), 32)
+   C = '\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f'     # debug
+
+   MHSH = SHA256(C+LMID+bytstr(MNUM,4)+D_MESG+message).digest()
+
+   LMOTSprvkey = calc_LMOTSprvkey(LMSprvkey, LMID, n, MPRT, MNUM)
+
+   s = []
+   for i in xrange(0, MPRT):
+      a = coef(MHSH+cksm(MHSH, n, w), i, w)
+      tmp = LMOTSprvkey[i]
+      for j in xrange(0, a):
+         tmp = SHA256(tmp+LMID+bytstr(MNUM,4)+bytstr(i,2)+bytstr(j,2)+D_ITER).digest()
+      s.append(tmp)
+
+   return bytstr(TYPE, 4)+C+MNUM+s
 
 # ===== BEGIN MAIN PROGRAM =====
 
@@ -149,6 +199,8 @@ from LMOTS_SHA256_N32_W4 import *
 LMID = "LMS_SHA256_N32_W4_H5\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e"
 MNUM = 6 # message number (q)
 h = 4 # height (num of levels - 1) of tree; NUMS = 2^h
+
+message = "draft-mcgrew-hash-sigs-04"
 
 
 # Read LMS private key from storage
@@ -183,5 +235,8 @@ for i in xrange(0, 2**h):
 LMS_pubkey = calc_LMS_pub(h, LMID, OTSpubkeys)
 
 Byteprint("\nLMS public key: ",LMS_pubkey)
+
+
+LMS_calc_sig(message, LMSprvkey, LMID, MNUM)
 
 # ===== END MAIN PROGRAM =====
