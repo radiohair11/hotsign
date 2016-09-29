@@ -75,7 +75,6 @@ def calc_LMOTSprvkey(LMSprvkey, LMID, n, MPRT, MNUM):
    return LMOTSprvkey
 
 
-
 def calc_LMOTSpubkey(LMSprvkey, LMID, n, w, MNUM):
    '''Calculate one LMOTS public key from the LMS private key (seed).'''
 
@@ -115,7 +114,6 @@ def calc_LMS_pub(h, LMID, OTSpubkeys):
    D = []   # data stack
    I = []   # integer stack
 
-
    for i in xrange(0, 2**h, 2):
       level = 0
       for j in xrange(0, 2):
@@ -147,12 +145,16 @@ def calc_LMS_pub(h, LMID, OTSpubkeys):
    return D.pop()
 
 
-def coef(bitstring, index, w):
-   MASK = bytstr(2**w-1, 32)
-   NBYT = int(math.floor(index*w/8))
-   Byteprint("\nbitstring = ",bitstring)
-   OPND = bitstring[NBYT:NBYT+8]
-   Byteprint("\nOPND = ", OPND)
+def coef(string, index, w):
+   '''Calculate the 'i'th w-bit slice of string'''
+   import array
+
+   bytes = array.array('B', string)
+   MASK = 2**w-1
+   NBYT = int(index*w/8)
+   Byteprint("\nstring = ",string)
+   OPND = bytes[NBYT]
+   print "OPND = ", OPND
    RSFT = 8 - (w*(i%(8/w))+w)
    return MASK&(OPND>>RSFT)
 
