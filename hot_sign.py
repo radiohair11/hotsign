@@ -145,6 +145,25 @@ def calc_LMS_pub(h, LMID, OTSpubkeys):
    return D.pop()
 
 
+def update_state(req_MNUM):
+   '''Get current state and store new state'''
+
+   statefile = open("statefile", "rb")
+   current_state = int(statefile.read(1))
+
+   if req_MNUM < 0:
+      statefile.write(str(current_state+1))
+      return current_state
+   elif req_MNUM < current_state:
+      print "Your attempt to sign with a used key has been reported to the authorities."
+   elif req_MNUM == current_state:
+      statefile.write(str(current_state+1))
+      return current_state
+   elif req_MNUM > current_state:
+      statefile.write(str(req_MNUM+1))
+      return req_MNUM
+      
+
 def coef(string, index, w):
    '''Calculate the 'i'th w-bit slice of string'''
    import array
@@ -156,7 +175,9 @@ def coef(string, index, w):
    OPND = bytes[NBYT]
    print "OPND = ", OPND
    RSFT = 8 - (w*(i%(8/w))+w)
-   return MASK&(OPND>>RSFT)
+   result = MASK&(OPND>>RSFT)
+   print result
+   return result
 
 
 def cksm(MHSH, n, w):
@@ -168,7 +189,7 @@ def cksm(MHSH, n, w):
    return csum<<calc_ls(n, w, 16)
 
 
-def LMS_calc_sig(message, LMSprvkey, LMID, MNUM):
+def LMS_calc_OTsig(message, LMSprvkey, LMID, MNUM):
 
    D_ITER = '\x00'
    D_MESG = '\x02'
@@ -179,18 +200,19 @@ def LMS_calc_sig(message, LMSprvkey, LMID, MNUM):
    C = '\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f'     # debug
 
    MHSH = SHA256(C+LMID+bytstr(MNUM,4)+D_MESG+message).digest()
+   MHCS = MHSH+bytstr(cksm(MHSH, n, w))
 
    LMOTSprvkey = calc_LMOTSprvkey(LMSprvkey, LMID, n, MPRT, MNUM)
 
    s = []
    for i in xrange(0, MPRT):
-      a = coef(MHSH+cksm(MHSH, n, w), i, w)
+      a = coef(MHCS, i, w)
       tmp = LMOTSprvkey[i]
       for j in xrange(0, a):
          tmp = SHA256(tmp+LMID+bytstr(MNUM,4)+bytstr(i,2)+bytstr(j,2)+D_ITER).digest()
       s.append(tmp)
 
-   return bytstr(TYPE, 4)+C+MNUM+s
+   return [TYPE,C,MNUM,s]
 
 # ===== BEGIN MAIN PROGRAM =====
 
@@ -236,9 +258,21 @@ for i in xrange(0, 2**h):
 
 LMS_pubkey = calc_LMS_pub(h, LMID, OTSpubkeys)
 
-Byteprint("\nLMS public key: ",LMS_pubkey)
+Byteprint("\nLMS public key: ",LMS_pubkey)     # debug
 
 
-LMS_calc_sig(message, LMSprvkey, LMID, MNUM)
+# Generate an LMOTS signature
+
+LMS_OTsig = LMS_calc_OTsig(message, LMSprvkey, LMID, MNUM)
+
+#---------- Print statements for debug ----------
+Byteprint("\nTypecode: ",LMS_OTsig[0])
+Byteprint("\nDiversification string: ",LMS_OTsig[1])
+print "\nMessage number: ",LMS_OTsig[2]
+j = 0
+for i in LMS_OTsig[3]:
+   Byteprint ("\nSignature part "+str(j)+": ",i)
+   j = j+1
+#---------- Print statements for debug ----------
 
 # ===== END MAIN PROGRAM =====
