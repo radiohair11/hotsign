@@ -173,10 +173,8 @@ def coef(string, index, w):
    NBYT = int(index*w/8)
    Byteprint("\nstring = ",string)
    OPND = bytes[NBYT]
-   print "OPND = ", OPND
-   RSFT = 8 - (w*(i%(8/w))+w)
+   RSFT = 8 - (w*(index%(8/w))+w)
    result = MASK&(OPND>>RSFT)
-   print result
    return result
 
 
