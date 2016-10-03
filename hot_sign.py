@@ -108,19 +108,26 @@ def calc_LMOTSpubkey(LMSprvkey, LMID, n, w, MNUM):
 def calc_LMS_pub(h, LMID, OTSpubkeys):
    '''Calculate the n-byte LMS public key from a set n-byte LMOTS public keys.'''
 
+   nodefile = open("nodefile", "wb", 0)
+
    D_LEAF = '\x03'
    D_INTR = '\x04'
 
    D = []   # data stack
    I = []   # integer stack
+   NODES = []
 
    for i in xrange(0, 2**h, 2):
       level = 0
       for j in xrange(0, 2):
          NODN = 2**h+i+j
          print "\ni = ", i,"j = ",j,"Leaf node number = ", NODN     # debug
-         D.append(SHA256(OTSpubkeys[i+j]+LMID+bytstr(NODN)+D_LEAF).digest())
-         print "   Leaf ",i+j," pushed onto data stack."     #debug
+         NODV = SHA256(OTSpubkeys[i+j]+LMID+bytstr(NODN)+D_LEAF).digest()
+         Byteprint("NODV: ",NODV)     # debug
+         nodefile.write(bytstr(NODN,1)+':'+NODV)
+         D.append(NODV)
+         print "   Leaf ",i+j," pushed onto data stack."     # debug
+         
          I.append(level)
          print "j loop: I, len(I) = ",I, len(I)     # debug
       while len(I) >= 2:
@@ -136,7 +143,9 @@ def calc_LMS_pub(h, LMID, OTSpubkeys):
             NODN = (2**h+i)/(2**(level+1))
             print "Tree node number: ", NODN     # debug
             TMP.update(LMID+bytstr(NODN)+D_INTR)
-            D.append(TMP.digest())
+            NODV = TMP.digest()
+            nodefile.write(bytstr(NODN,1)+':'+NODV)
+            D.append(NODV)
             print "Two child values hashed and pushed on data stack."     # debug
             I.append(level+1)
             print "while loop: I, len(I) = ", I, len(I)     # debug
@@ -171,11 +180,9 @@ def coef(string, index, w):
    bytes = array.array('B', string)
    MASK = 2**w-1
    NBYT = int(index*w/8)
-   Byteprint("\nstring = ",string)
    OPND = bytes[NBYT]
    RSFT = 8 - (w*(index%(8/w))+w)
-   result = MASK&(OPND>>RSFT)
-   return result
+   return MASK&(OPND>>RSFT)
 
 
 def cksm(MHSH, n, w):
@@ -229,6 +236,7 @@ message = "draft-mcgrew-hash-sigs-04"
 
 keyfile = open("keyfile", "rb")
 LMSprvkey = keyfile.read(32)
+keyfile.close()
 
 #---------- Print statements for debug ----------
 print "\nLMS private key: "        # potential endian problem!!!
