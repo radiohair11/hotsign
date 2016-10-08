@@ -124,7 +124,7 @@ def calc_LMS_pub(h, LMID, OTSpubkeys):
          print "\ni = ", i,"j = ",j,"Leaf node number = ", NODN     # debug
          NODV = SHA256(OTSpubkeys[i+j]+LMID+bytstr(NODN)+D_LEAF).digest()
          Byteprint("NODV: ",NODV)     # debug
-         nodefile.write(bytstr(NODN,1)+':'+NODV)
+         NODES.append([NODN, NODV])
          D.append(NODV)
          print "   Leaf ",i+j," pushed onto data stack."     # debug
          
@@ -144,13 +144,17 @@ def calc_LMS_pub(h, LMID, OTSpubkeys):
             print "Tree node number: ", NODN     # debug
             TMP.update(LMID+bytstr(NODN)+D_INTR)
             NODV = TMP.digest()
-            nodefile.write(bytstr(NODN,1)+':'+NODV)
+            NODES.append([NODN, NODV])
             D.append(NODV)
             print "Two child values hashed and pushed on data stack."     # debug
             I.append(level+1)
             print "while loop: I, len(I) = ", I, len(I)     # debug
          else:
             break
+   NODES.sort()
+   for i in NODES:
+      nodefile.write(bytstr(i[0],1)+':'+i[1])
+   nodefile.close()
    return D.pop()
 
 
@@ -219,6 +223,32 @@ def LMS_calc_OTsig(message, LMSprvkey, LMID, MNUM):
 
    return [TYPE,C,MNUM,s]
 
+def LMS_discover_path(h, MNUM):
+   '''Create a list of off-branch node numbers'''
+   PATH = []
+   node_num = 2**h+MNUM
+   while node_num > 1:
+      if node_num % 2 == 0:
+         node_num = node_num + 1
+      else:
+         node_num = node_num - 1
+      print "node_num: ", node_num     # debug
+      PATH.append(node_num)
+      node_num = node_num//2
+   return PATH
+
+def LMS_retrieve_node_vals(PATH):
+   '''Read the node values from file saved at key-gen'''
+   nodefile = open("nodefile", "rb", 0)
+
+   TVECT = []
+   for i in PATH:
+      nodefile.seek((i-1)*34+2)
+      TVECT.append(nodefile.read(32))
+   nodefile.close()
+   return TVECT
+
+
 # ===== BEGIN MAIN PROGRAM =====
 
 from LMOTS_SHA256_N32_W4 import *
@@ -271,14 +301,40 @@ Byteprint("\nLMS public key: ",LMS_pubkey)     # debug
 
 LMS_OTsig = LMS_calc_OTsig(message, LMSprvkey, LMID, MNUM)
 
+# Generate Merkle tree off-branch path
+
+PATH = LMS_discover_path(h, MNUM)
+TVECT = LMS_retrieve_node_vals(PATH)
+
 #---------- Print statements for debug ----------
 Byteprint("\nTypecode: ",LMS_OTsig[0])
 Byteprint("\nDiversification string: ",LMS_OTsig[1])
 print "\nMessage number: ",LMS_OTsig[2]
 j = 0
 for i in LMS_OTsig[3]:
-   Byteprint ("\nSignature part "+str(j)+": ",i)
+   Byteprint("\nSignature part "+str(j)+": ",i)
    j = j+1
+j = 0
+for i in TVECT:
+   Byteprint("\nPath part "+str(j)+": ",i)
+   j = j + 1
 #---------- Print statements for debug ----------
+
+# Store signature
+
+sigfile = open("sigfile", "wb")
+sigfile.write(LMS_OTsig[0])
+sigfile.write(LMS_OTsig[1])
+sigfile.write(str(LMS_OTsig[2]))
+j = 0
+for i in LMS_OTsig[3]:
+   sigfile.write(i)
+   j = j+1
+j = 0
+for i in TVECT:
+   sigfile.write(i)
+   j = j + 1
+sigfile.close()
+
 
 # ===== END MAIN PROGRAM =====
