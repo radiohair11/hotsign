@@ -325,7 +325,7 @@ for i in TVECT:
 sigfile = open("sigfile", "wb")
 sigfile.write(LMS_OTsig[0])
 sigfile.write(LMS_OTsig[1])
-sigfile.write(str(LMS_OTsig[2]))
+sigfile.write(bytstr(LMS_OTsig[2],4))
 j = 0
 for i in LMS_OTsig[3]:
    sigfile.write(i)
