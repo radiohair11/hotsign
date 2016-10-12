@@ -1,6 +1,9 @@
 #!/usr/bin/python
 
 import math
+from hashlib import sha256 as SHA256
+import hmac as HMAC
+import binascii
 
 def Byteprint(caption, hexstr, linelen=16):
    '''Pretty print hex strings with leading caption.'''
@@ -24,6 +27,26 @@ def calc_p(n, w):
    v = math.ceil((math.floor(math.log((2**w - 1) * u, 2)) + 1) / w)
    p = u+v
    return int(p)
+
+
+def calc_ls(n, w, sumbits):
+   '''Calc number of left shift bits for checksum'''
+   u = math.ceil(8 * n / w)
+   v = math.ceil((math.floor(math.log((2**w - 1) * u, 2)) + 1) / w)
+   shftl = sumbits - (v*w)
+   return int(shftl)
+
+
+def LMS_read_pubkey():
+   from struct import unpack
+   pubkeyfile = open("pubkeyfile", "rb")
+   pubtype = pubkeyfile.read(4)
+   Byteprint("Public key type: ",pubtype)     # debug
+   LMID = pubkeyfile.read(32)
+   Byteprint("LMID: ",LMID)     # debug
+   LMSpubkey = pubkeyfile.read(32)
+   Byteprint("LMS public key: ", LMSpubkey)     # debug
+   return [pubtype, LMID, LMSpubkey]
 
 
 def LMS_read_sig(p):
@@ -53,9 +76,69 @@ def LMS_read_sig(p):
 
    return [sigtype, divstring, MNUM, S, T]
 
+def coef(string, index, w):
+   '''Calculate the 'i'th w-bit slice of string'''
+   import array
+
+   bytes = array.array('B', string)
+   MASK = 2**w-1
+   NBYT = int(index*w/8)
+   OPND = bytes[NBYT]
+   RSFT = 8 - (w*(index%(8/w))+w)
+   return MASK&(OPND>>RSFT)
+
+
+def cksm(MHSH, n, w):
+   '''Calculate checksum (section 4.6)'''
+   csum = 0
+   u = int(math.ceil(8 * n / w))
+   for i in xrange(0, u):
+      csum = csum + (2**w-1) - coef(MHSH, i, w)
+   return csum<<calc_ls(n, w, 16)
+
+
+def LMS_verify_LMOTS_sig(message, MPRT, LMID, divstring, MNUM, S):
+
+   D_ITER = '\x00'
+   D_PBLC = '\x01'
+   D_MESG = '\x02'
+
+   MHSH = SHA256(divstring+LMID+bytstr(MNUM,4)+D_MESG+message).digest()
+   MHCS = MHSH+bytstr(cksm(MHSH, n, w))
+
+   z = []
+   for i in xrange(0, MPRT):
+      a = (2**w-1) - coef(MHCS, i, w)
+      tmp = S[i]
+      for j in xrange(0, a):
+         tmp = SHA256(tmp+LMID+bytstr(MNUM,4)+bytstr(i,2)+bytstr(j,2)+D_ITER).digest()
+      z.append(tmp)
+
+   Z = SHA256()
+   Z.update(LMID+bytstr(MNUM,4))
+   for i in xrange(0, MPRT):
+     Z.update(z[i])
+   Z.update(D_PBLC)
+   return Z.digest()
+   
+
 # ===== BEGIN MAIN PROGRAM =====
 
 from LMOTS_SHA256_N32_W4 import *
 
-p = calc_p(n, w)
-LMS_sig = LMS_read_sig(p)
+message = "draft-mcgrew-hash-sigs-04"
+
+MPRT = calc_p(n, w)
+LMS_pubkey = LMS_read_pubkey()     # typecode, LMID, LMSpubkey
+LMS_sig = LMS_read_sig(MPRT)          # typecode, divstring, MNUM, S, T
+
+if LMS_sig[0] != LMS_pubkey[0]:
+   print "Incorrect typecode. Signature is not valid."
+   os._exit(1)
+else:                            # debug
+   print "Typecode matches."     # debug
+
+candidate = LMS_verify_LMOTS_sig(message, MPRT, LMS_pubkey[1], LMS_sig[1], LMS_sig[2], LMS_sig[3])
+
+Byteprint("Candidate LMOTS pub key:", candidate)
+

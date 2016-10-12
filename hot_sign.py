@@ -55,6 +55,7 @@ def calc_ls(n, w, sumbits):
    shftl = sumbits - (v*w)
    return int(shftl)
 
+
 def calc_LMOTSprvkey(LMSprvkey, LMID, n, MPRT, MNUM):
    '''Calculate one LMOTS private key (list) from the LMS private key (seed)'''
 
@@ -249,7 +250,7 @@ def LMS_retrieve_node_vals(PATH):
    return TVECT
 
 
-# ===== BEGIN MAIN PROGRAM =====
+# ===== BEGIN MAIN PROGRAM ===== # ===== BEGIN MAIN PROGRAM ===== #
 
 from LMOTS_SHA256_N32_W4 import *
 
