@@ -42,7 +42,7 @@ def LMS_read_pubkey():
    pubkeyfile = open("pubkeyfile", "rb")
    pubtype = pubkeyfile.read(4)
    Byteprint("Public key type: ",pubtype)     # debug
-   LMID = pubkeyfile.read(32)
+   LMID = pubkeyfile.read(31)
    Byteprint("LMID: ",LMID)     # debug
    LMSpubkey = pubkeyfile.read(32)
    Byteprint("LMS public key: ", LMSpubkey)     # debug
@@ -108,9 +108,10 @@ def LMS_verify_LMOTS_sig(message, MPRT, LMID, divstring, MNUM, S):
 
    z = []
    for i in xrange(0, MPRT):
-      a = (2**w-1) - coef(MHCS, i, w)
+#      a = (2**w-1) - coef(MHCS, i, w)
+      a = coef(MHCS, i, w)
       tmp = S[i]
-      for j in xrange(0, a):
+      for j in xrange(a, 2**w-1):
          tmp = SHA256(tmp+LMID+bytstr(MNUM,4)+bytstr(i,2)+bytstr(j,2)+D_ITER).digest()
       z.append(tmp)
 
@@ -122,6 +123,21 @@ def LMS_verify_LMOTS_sig(message, MPRT, LMID, divstring, MNUM, S):
    return Z.digest()
    
 
+def LMS_calc_root(cand_node, LMID, NODN, T):
+   '''Hash path to putative root node value'''
+   D_INTR = '\x04'
+   T.reverse()
+   tmp = cand_node
+   while NODN > 1:
+      print "Node number: ", NODN     #debug
+      if NODN % 2 == 0:
+         tmp = SHA256(tmp+T.pop()+LMID+bytstr(NODN//2, 4)+D_INTR).digest()
+      else:
+         tmp = SHA256(T.pop()+tmp+LMID+bytstr(NODN//2, 4)+D_INTR).digest()
+      NODN = NODN//2
+      Byteprint("Node "+str(NODN)+": ", tmp)
+   return tmp
+
 # ===== BEGIN MAIN PROGRAM =====
 
 from LMOTS_SHA256_N32_W4 import *
@@ -129,8 +145,9 @@ from LMOTS_SHA256_N32_W4 import *
 message = "draft-mcgrew-hash-sigs-04"
 
 MPRT = calc_p(n, w)
-LMS_pubkey = LMS_read_pubkey()     # typecode, LMID, LMSpubkey
-LMS_sig = LMS_read_sig(MPRT)          # typecode, divstring, MNUM, S, T
+LMS_pubkey = LMS_read_pubkey()     # 0:typecode, 1:LMID, 2:LMSpubkey
+LMS_sig = LMS_read_sig(MPRT)          # 0:typecode, 1:divstring, 2:MNUM, 3:S, 4:T
+h = len(LMS_sig[4])
 
 if LMS_sig[0] != LMS_pubkey[0]:
    print "Incorrect typecode. Signature is not valid."
@@ -140,5 +157,17 @@ else:                            # debug
 
 candidate = LMS_verify_LMOTS_sig(message, MPRT, LMS_pubkey[1], LMS_sig[1], LMS_sig[2], LMS_sig[3])
 
-Byteprint("Candidate LMOTS pub key:", candidate)
+Byteprint("\nCandidate LMOTS pub key: ", candidate)
+
+cand_node = SHA256(candidate+LMS_pubkey[1]+bytstr(2**h+LMS_sig[2])+'\x03').digest()
+Byteprint("\nCandidate node value: ", cand_node)
+
+T1 = LMS_calc_root(cand_node, LMS_pubkey[1], 2**h+LMS_sig[2], LMS_sig[4])
+Byteprint("\nCandidate root (pub key): ", T1)
+Byteprint("\nTrue public key: ", LMS_pubkey[2])
+
+if T1 == LMS_pubkey[2]:
+   print "\nSignature is valid."
+else:
+   print "\nYou're being had."
 
