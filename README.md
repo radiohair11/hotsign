@@ -22,7 +22,7 @@ Files that will be created when **hotsign** is run:
 
 Usage: 
 ```
-hot_sign.py keygen [-n <16|32>] [-w <1|2|4|8>] [-h <5|10|20>]
-            sign <message fn> <private key fn>
-            verify <message fn> <public key fn>
+hotsign.py keygen [-n <16|32>] [-w <1|2|4|8>] [-h <5|10|20>]
+           sign <message fn> <private key fn>
+           verify <message fn> <public key fn>
 ```
