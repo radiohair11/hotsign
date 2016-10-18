@@ -5,7 +5,7 @@ NOTE: This README describes an objective for the code in this repository. The co
 
 Manifest:
 
-* hot_sign.py          - The main attraction.
+* hotsign.py          - The main attraction.
 * LMS_keygen.py        - Generates an LMS keypair and associated data.
 * LMS_sign.py          - Signs a message (contained in a file).
 * LMS_verify.py        - Verifies the putative signature (sigfile)
