@@ -38,32 +38,41 @@ def calc_ls(n, w, sumbits):
 
 
 def LMS_read_pubkey():
+
    from struct import unpack
+
    pubkeyfile = open("pubkeyfile", "rb")
-   pubtype = pubkeyfile.read(4)
-   Byteprint("Public key type: ",pubtype)     # debug
+   pubtype = unpack('>I', pubkeyfile.read(4))[0]
+   print "Public key type: ", pubtype      # debug
    LMID = pubkeyfile.read(31)
    Byteprint("LMID: ",LMID)     # debug
    LMSpubkey = pubkeyfile.read(32)
    Byteprint("LMS public key: ", LMSpubkey)     # debug
-   return [pubtype, LMID, LMSpubkey]
+   return pubtype, LMID, LMSpubkey
 
 
-def LMS_read_sig(p):
+def LMS_read_sig(sigfn):
 
-   import struct
+   from struct import unpack
+   import typecode_registry
 
-   sigfile = open("sigfile", "rb")
+   sigfile = open(sigfn, "rb")
 
-   sigtype = sigfile.read(4)
-   Byteprint("Signature type: ", sigtype)     # debug
+   LMS_typecode = unpack('>I', sigfile.read(4))[0]
+   print "LMS typecode: ", LMS_typecode     # debug
+   LMOTS_typecode = unpack('>I', sigfile.read(4))[0]
+   print "LMOTS typecode: ", LMOTS_typecode     # debug
    MSLT = sigfile.read(32)
    Byteprint("Message salt: ", MSLT)     # debug
-   MNUM = struct.unpack('>I', sigfile.read(4))[0]
+   MNUM = unpack('>I', sigfile.read(4))[0]
    print "Message number: ", MNUM     # debug
 
+   MHWD = typecode_registry.LMOTS_parms[LMOTS_typecode][0]
+   MSLC = typecode_registry.LMOTS_parms[LMOTS_typecode][1]
+   MPRT = calc_p(MHWD, MSLC)
+
    S = []
-   for i in xrange(0,p):
+   for i in xrange(0,MPRT):
       S.append(sigfile.read(32))
 
    T = []
@@ -74,7 +83,7 @@ def LMS_read_sig(p):
 
    sigfile.close()
 
-   return [sigtype, MSLT, MNUM, S, T]
+   return [LMS_typecode, MSLT, MNUM, S, T], MHWD, MSLC, MPRT
 
 def coef(string, index, w):
    '''Calculate the 'i'th w-bit slice of string'''
@@ -97,21 +106,21 @@ def cksm(MHSH, n, w):
    return csum<<calc_ls(n, w, 16)
 
 
-def LMS_verify_LMOTS_sig(message, MPRT, LMID, MSLT, MNUM, S):
+def LMS_verify_LMOTS_sig(message, MHWD, MSLC, MPRT, LMID, MSLT, MNUM, S):
 
    D_ITER = '\x00'
    D_PBLC = '\x01'
    D_MESG = '\x02'
 
    MHSH = SHA256(MSLT+LMID+bytstr(MNUM,4)+D_MESG+message).digest()
-   MHCS = MHSH+bytstr(cksm(MHSH, n, w))
+   MHCS = MHSH+bytstr(cksm(MHSH, MHWD, MSLC))
 
    z = []
    for i in xrange(0, MPRT):
 #      a = (2**w-1) - coef(MHCS, i, w)
-      a = coef(MHCS, i, w)
+      a = coef(MHCS, i, MSLC)
       tmp = S[i]
-      for j in xrange(a, 2**w-1):
+      for j in xrange(a, 2**MSLC-1):
          tmp = SHA256(tmp+LMID+bytstr(MNUM,4)+bytstr(i,2)+bytstr(j,2)+D_ITER).digest()
       z.append(tmp)
 
@@ -138,36 +147,46 @@ def LMS_calc_root(cand_node, LMID, NODN, T):
       Byteprint("Node "+str(NODN)+": ", tmp)
    return tmp
 
-# ===== BEGIN MAIN PROGRAM =====
+# ===== MAIN FUNCTION ===== # ===== MAIN FUNCTION ===== #
+def LMS_verify(msgfn, sigfn):
 
-from LMOTS_SHA256_N32_W4 import *
+   import struct
 
-message = "draft-mcgrew-hash-sigs-04"
+# Retrieve typecode, LMID, and public key from public key file
 
-MPRT = calc_p(n, w)
-LMS_pubkey = LMS_read_pubkey()     # 0:typecode, 1:LMID, 2:LMSpubkey
-LMS_sig = LMS_read_sig(MPRT)       # 0:typecode, 1:MSLT, 2:MNUM, 3:S, 4:T
-h = len(LMS_sig[4])
+   LMS_typecode, LMID, LMS_pubkey = LMS_read_pubkey()
 
-if LMS_sig[0] != LMS_pubkey[0]:
-   print "Incorrect typecode. Signature is not valid."
-   os._exit(1)
-else:                            # debug
-   print "Typecode matches."     # debug
+# Read message
 
-candidate = LMS_verify_LMOTS_sig(message, MPRT, LMS_pubkey[1], LMS_sig[1], LMS_sig[2], LMS_sig[3])
+   msgfile = open(msgfn, "rb")
+   message = msgfile.read()
+   msgfile.close()
 
-Byteprint("\nCandidate LMOTS pub key: ", candidate)
+# Read signature: 0:LMS_typecode, 1:MSLT, 2:MNUM, 3:S, 4:T
 
-cand_node = SHA256(candidate+LMS_pubkey[1]+bytstr(2**h+LMS_sig[2])+'\x03').digest()
-Byteprint("\nCandidate node value: ", cand_node)
+   LMS_sig, MHWD, MSLC, MPRT= LMS_read_sig(sigfn)
 
-T1 = LMS_calc_root(cand_node, LMS_pubkey[1], 2**h+LMS_sig[2], LMS_sig[4])
-Byteprint("\nCandidate root (pub key): ", T1)
-Byteprint("\nTrue public key: ", LMS_pubkey[2])
+   THGT = len(LMS_sig[4])
 
-if T1 == LMS_pubkey[2]:
-   print "\nSignature is valid."
-else:
-   print "\nYou're being had."
+   if LMS_sig[0] != LMS_typecode:
+      print "Incorrect typecode. Signature is not valid."
+      os._exit(1)
+   else:                            # debug
+      print "Typecode matches."     # debug
 
+   candidate = LMS_verify_LMOTS_sig(message, MHWD, MSLC, MPRT, LMID, \
+                                    LMS_sig[1], LMS_sig[2], LMS_sig[3])
+   Byteprint("\nCandidate LMOTS pub key: ", candidate)
+
+   cand_node = SHA256(candidate+LMID+bytstr(2**THGT+LMS_sig[2])+'\x03').digest()
+   Byteprint("\nCandidate node value: ", cand_node)
+
+   T1 = LMS_calc_root(cand_node, LMID, 2**THGT+LMS_sig[2], LMS_sig[4])
+   Byteprint("\nCandidate root (pub key): ", T1)
+   Byteprint("\nTrue public key: ", LMS_pubkey)
+
+   if T1 == LMS_pubkey:
+      print "\nSignature is valid."
+   else:
+      print "\nYou're being had."
+# ===== END MAIN FUNCTION ===== # ===== END MAIN FUNCTION ===== #

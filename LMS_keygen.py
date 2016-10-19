@@ -17,10 +17,10 @@ def LMS_genprvkey(typecode, string):
       LMSseed = bytstr(random.getrandbits(256),32)
       LMSprvkey = HMAC.new(LMSseed, string+'LMSprvkey', SHA256).digest()
       prvkeyfile = open("prvkeyfile","wb",0)
-      prvkeyfile.write(str(typecode)+LMSprvkey)
+      prvkeyfile.write(bytstr(typecode, 4)+LMSprvkey)
       # Initialize state file
       statefile = open("statefile","w",0)
-      statefile.write('\x00')
+      statefile.write(bytstr(0, 4))
       # Cleanup and return
       prvkeyfile.close()
       statefile.close()

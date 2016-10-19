@@ -1,10 +1,10 @@
 #!/usr/bin/python
 '''
-hot_args [COMMAND]
+hotsign [COMMAND]
 
 COMMAND:     keygen [-n <hash width>] [-w <part width>] [-h <tree height>]
              sign <message filename>
-             verify <signature filename>
+             verify <message filename> <signature filename>
 '''
 
 import sys
@@ -56,19 +56,26 @@ try:
          if do_anyway != "yes":
             print "No signature created."
             EXIT(1)
-      print "\nSigning..."
       if not path.exists(args[1]):
          print "\nMessage file does not exist."; EXIT()
 #      elif !path.exists(args[2]):
 #        print "\nPublic key file does not exist."; EXIT()
       else:
+         print "\nSigning..."
          from LMS_sign import LMS_sign
          LMS_sign(args[1])
          print "\n... Done."
 
    elif sys.argv[1] == "verify":
-      print "\nVerifying..."
-      print "\n... Done."
+      if not path.exists(args[1]):
+         print "\nMessage file does not exist."; EXIT()
+      elif not path.exists(args[2]):
+         print "\nSignature file does not exist."; EXIT()
+      else:
+         print "\nVerifying..."
+         from LMS_verify import LMS_verify
+         LMS_verify(args[1], args[2])
+         print "\n... Done."
    else:
       print "Unknown option"
 except IndexError:

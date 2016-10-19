@@ -85,15 +85,15 @@ def update_state(req_MNUM):
    current_state = struct.unpack('>I', statefile.read(4))[0]
 
    if req_MNUM < 0:
-      statefile.write(str(current_state+1))
+      statefile.write(bytstr(current_state+1, 4))
       return current_state
    elif req_MNUM < current_state:
       print "Your attempt to sign with a used key has been reported to the authorities."
    elif req_MNUM == current_state:
-      statefile.write(str(current_state+1))
+      statefile.write(bytstr(current_state+1, 4))
       return current_state
    elif req_MNUM > current_state:
-      statefile.write(str(req_MNUM+1))
+      statefile.write(bytstr(req_MNUM+1, 4))
       return req_MNUM
       
 
@@ -140,7 +140,7 @@ def LMS_calc_OTsig(message, LMSprvkey, LMID, MHWD, MSLC, MNUM):
          tmp = SHA256(tmp+LMID+bytstr(MNUM,4)+bytstr(i,2)+bytstr(j,2)+D_ITER).digest()
       s.append(tmp)
 
-   return [MSLT,s]
+   return MSLT,s
 
 def LMS_discover_path(h, MNUM):
    '''Create a list of off-branch node numbers'''
@@ -214,7 +214,7 @@ def LMS_sign(msgfn):
 
 # Generate an LMOTS signature
 
-   LMS_OTsig = LMS_calc_OTsig(message, LMSprvkey, LMID, MHWD, MSLC, MNUM)
+   MSLT, LMS_OTsig = LMS_calc_OTsig(message, LMSprvkey, LMID, MHWD, MSLC, MNUM)
 
 # Generate Merkle tree off-branch path
 
@@ -224,10 +224,10 @@ def LMS_sign(msgfn):
 #---------- Print statements for debug ----------
    Byteprint("\nLMS typecode: ", bytstr(LMS_typecode, 4))
    Byteprint("\nLMOTS typecode: ", bytstr(LMOTS_typecode, 4))
-   Byteprint("\nDiversification string: ",LMS_OTsig[0])
+   Byteprint("\nDiversification string: ",MSLT)
    Byteprint("\nMessage number: ", bytstr(MNUM, 4))
    j = 0
-   for i in LMS_OTsig[1]:
+   for i in LMS_OTsig:
       Byteprint("\nSignature part "+str(j)+": ",i)
       j = j+1
    j = 0
@@ -241,10 +241,10 @@ def LMS_sign(msgfn):
    sigfile = open("sig."+msgfn, "wb")
    sigfile.write(bytstr(LMS_typecode, 4))
    sigfile.write(bytstr(LMOTS_typecode, 4))
-   sigfile.write(LMS_OTsig[0])
+   sigfile.write(MSLT)
    sigfile.write(bytstr(MNUM,4))
    j = 0
-   for i in LMS_OTsig[1]:
+   for i in LMS_OTsig:
       sigfile.write(i)
       j = j+1
    j = 0
