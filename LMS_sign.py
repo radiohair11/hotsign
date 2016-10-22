@@ -140,7 +140,6 @@ def LMS_calc_OTsig(message, LMSprvkey, LMID, MHWD, MSLC, MNUM):
       tmp = LMOTSprvkey[i]
       for j in xrange(0, a):
          tmp = SHA256(tmp+LMID+bytstr(MNUM,4)+bytstr(i,2)+bytstr(j,2)+D_ITER).digest()
-         Byteprint("Chain "+str(i)+", element "+str(j)+": ", tmp)
       s.append(tmp)
 
    return MSLT,s

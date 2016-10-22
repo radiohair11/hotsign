@@ -32,7 +32,7 @@ def calc_LMOTSprvkey(LMSprvkey, LMID, n, MPRT, MNUM):
    '''Calculate one LMOTS private key (list) from the LMS private key (seed)'''
 
    # Generate per-message LMOTS seed from LMS private key
-# >>>>>
+
    string = "LMOTS"+bytstr(0,1)+LMID+bytstr(MNUM,4)+bytstr(n*8,2)
    OTSprvseed = HMAC.new(LMSprvkey, string, SHA256).digest()
    Byteprint("\nLMOTS seed: ", OTSprvseed)     # debug
@@ -66,7 +66,6 @@ def calc_LMOTSpubkey(LMSprvkey, LMID, n, w, MNUM):
      tmp = LMOTSprvkey[i]
      for j in xrange(0, 2**w-1):
        tmp = SHA256(tmp+LMID+bytstr(MNUM,4)+bytstr(i,2)+bytstr(j,2)+D_ITER).digest()
-       Byteprint("Chain "+str(i)+", element "+str(j)+": ", tmp)
      y.append(tmp)
 
    # Generate per-message n-byte LMOTS public key

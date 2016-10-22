@@ -114,7 +114,6 @@ def LMS_verify_LMOTS_sig(message, MHWD, MSLC, MPRT, LMID, MSLT, MNUM, S):
       tmp = S[i]
       for j in xrange(a, 2**MSLC-1):
          tmp = SHA256(tmp+LMID+bytstr(MNUM,4)+bytstr(i,2)+bytstr(j,2)+D_ITER).digest()
-         Byteprint("Chain "+str(i)+", element "+str(j)+": ", tmp)
       z.append(tmp)
 
    Z = SHA256()
