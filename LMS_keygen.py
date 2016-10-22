@@ -7,6 +7,7 @@ from hashlib import sha256 as SHA256
 import hmac as HMAC
 from LMS_func import *   # Byteprint, bytstr, calc_p, and calc_ls
 
+
 def LMS_genprvkey(typecode, string):
 
    if os.path.exists("keyfile") or os.path.exists("statefile"):
@@ -26,11 +27,12 @@ def LMS_genprvkey(typecode, string):
       statefile.close()
       return LMSprvkey
 
+
 def calc_LMOTSprvkey(LMSprvkey, LMID, n, MPRT, MNUM):
    '''Calculate one LMOTS private key (list) from the LMS private key (seed)'''
 
    # Generate per-message LMOTS seed from LMS private key
-
+# >>>>>
    string = "LMOTS"+bytstr(0,1)+LMID+bytstr(MNUM,4)+bytstr(n*8,2)
    OTSprvseed = HMAC.new(LMSprvkey, string, SHA256).digest()
    Byteprint("\nLMOTS seed: ", OTSprvseed)     # debug
@@ -64,6 +66,7 @@ def calc_LMOTSpubkey(LMSprvkey, LMID, n, w, MNUM):
      tmp = LMOTSprvkey[i]
      for j in xrange(0, 2**w-1):
        tmp = SHA256(tmp+LMID+bytstr(MNUM,4)+bytstr(i,2)+bytstr(j,2)+D_ITER).digest()
+       Byteprint("Chain "+str(i)+", element "+str(j)+": ", tmp)
      y.append(tmp)
 
    # Generate per-message n-byte LMOTS public key
@@ -154,15 +157,15 @@ def LMS_keygen(n, w, h):
    # from LMOTS_SHA256_N32_W4 import *
    # h = 4
 
-   from typecode_registry import *
+   import typecode_registry
 
    LMOTS_name = "LMOTS_SHA256_N"+str(n)+"_W"+str(w)
    LMS_name = "LMS_SHA256_N"+str(n)+"_H"+str(h)
-   LMOTS_typecode = LMOTS_typecodes[LMOTS_name]
-   LMS_typecode = LMS_typecodes[LMS_name]
-   n = LMOTS_parms[LMOTS_typecode][0]
-   w = LMOTS_parms[LMOTS_typecode][1]
-   h = LMS_parms[LMS_typecode][1]
+   LMOTS_typecode = typecode_registry.LMOTS_typecodes[LMOTS_name]
+   LMS_typecode = typecode_registry.LMS_typecodes[LMS_name]
+   MHWD = typecode_registry.LMOTS_parms[LMOTS_typecode][0]
+   MSLC = typecode_registry.LMOTS_parms[LMOTS_typecode][1]
+   THGT = typecode_registry.LMS_parms[LMS_typecode][1]
 
 
 # Generate private key and state and store to file
@@ -170,9 +173,11 @@ def LMS_keygen(n, w, h):
    LMSprvkey = LMS_genprvkey(LMOTS_typecode, LMOTS_name+LMS_name)
    Byteprint("\nLMS private key: ", LMSprvkey)     # debug
 
-   LMID = HMAC.new(LMSprvkey, LMOTS_name+LMS_name+"LMID", SHA256).digest()
+   tmp = HMAC.new(LMSprvkey, LMOTS_name+LMS_name+"LMID", SHA256).digest()
+   LMID = tmp[0:31]
+   Byteprint("\nLMID: ", LMID)
 
-   LMSpubkey = LMS_genpubkey(LMSprvkey, h, n, w, LMID)
+   LMSpubkey = LMS_genpubkey(LMSprvkey, THGT, MHWD, MSLC, LMID)
    Byteprint("\nLMS public key: ", LMSpubkey)     #debug
 
 # Write out LMS public key (u32str(type)||I||T[1])

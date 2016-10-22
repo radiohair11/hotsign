@@ -43,11 +43,8 @@ def LMS_read_pubkey():
 
    pubkeyfile = open("pubkeyfile", "rb")
    pubtype = unpack('>I', pubkeyfile.read(4))[0]
-   print "Public key type: ", pubtype      # debug
    LMID = pubkeyfile.read(31)
-   Byteprint("LMID: ",LMID)     # debug
    LMSpubkey = pubkeyfile.read(32)
-   Byteprint("LMS public key: ", LMSpubkey)     # debug
    return pubtype, LMID, LMSpubkey
 
 
@@ -59,13 +56,9 @@ def LMS_read_sig(sigfn):
    sigfile = open(sigfn, "rb")
 
    LMS_typecode = unpack('>I', sigfile.read(4))[0]
-   print "LMS typecode: ", LMS_typecode     # debug
    LMOTS_typecode = unpack('>I', sigfile.read(4))[0]
-   print "LMOTS typecode: ", LMOTS_typecode     # debug
    MSLT = sigfile.read(32)
-   Byteprint("Message salt: ", MSLT)     # debug
    MNUM = unpack('>I', sigfile.read(4))[0]
-   print "Message number: ", MNUM     # debug
 
    MHWD = typecode_registry.LMOTS_parms[LMOTS_typecode][0]
    MSLC = typecode_registry.LMOTS_parms[LMOTS_typecode][1]
@@ -83,7 +76,7 @@ def LMS_read_sig(sigfn):
 
    sigfile.close()
 
-   return [LMS_typecode, MSLT, MNUM, S, T], MHWD, MSLC, MPRT
+   return LMS_typecode, MSLT, MNUM, S, T, MHWD, MSLC, MPRT
 
 def coef(string, index, w):
    '''Calculate the 'i'th w-bit slice of string'''
@@ -117,11 +110,11 @@ def LMS_verify_LMOTS_sig(message, MHWD, MSLC, MPRT, LMID, MSLT, MNUM, S):
 
    z = []
    for i in xrange(0, MPRT):
-#      a = (2**w-1) - coef(MHCS, i, w)
       a = coef(MHCS, i, MSLC)
       tmp = S[i]
       for j in xrange(a, 2**MSLC-1):
          tmp = SHA256(tmp+LMID+bytstr(MNUM,4)+bytstr(i,2)+bytstr(j,2)+D_ITER).digest()
+         Byteprint("Chain "+str(i)+", element "+str(j)+": ", tmp)
       z.append(tmp)
 
    Z = SHA256()
@@ -154,7 +147,11 @@ def LMS_verify(msgfn, sigfn):
 
 # Retrieve typecode, LMID, and public key from public key file
 
-   LMS_typecode, LMID, LMS_pubkey = LMS_read_pubkey()
+   LMS_typecode_key, LMID, LMS_pubkey = LMS_read_pubkey()
+
+   print "Public key type: ", LMS_typecode_key      # debug
+   Byteprint("LMID: ",LMID)     # debug
+   Byteprint("LMS public key: ", LMS_pubkey)     # debug
 
 # Read message
 
@@ -164,24 +161,28 @@ def LMS_verify(msgfn, sigfn):
 
 # Read signature: 0:LMS_typecode, 1:MSLT, 2:MNUM, 3:S, 4:T
 
-   LMS_sig, MHWD, MSLC, MPRT= LMS_read_sig(sigfn)
+   LMS_typecode_sig, MSLT, MNUM, S, T, MHWD, MSLC, MPRT= LMS_read_sig(sigfn)
 
-   THGT = len(LMS_sig[4])
+   print "\nLMS typecode: ", LMS_typecode_sig #LMS_typecode     # debug
+#   print "LMOTS typecode: ", LMOTS_typecode     # debug
+   Byteprint("Message salt: ", MSLT)     # debug
+   print "Message number: ", MNUM     # debug
 
-   if LMS_sig[0] != LMS_typecode:
-      print "Incorrect typecode. Signature is not valid."
+   THGT = len(T)
+
+   if LMS_typecode_sig != LMS_typecode_key:
+      print "\nIncorrect typecode. Signature is not valid."
       os._exit(1)
    else:                            # debug
-      print "Typecode matches."     # debug
+      print "\nTypecode matches."     # debug
 
-   candidate = LMS_verify_LMOTS_sig(message, MHWD, MSLC, MPRT, LMID, \
-                                    LMS_sig[1], LMS_sig[2], LMS_sig[3])
+   candidate = LMS_verify_LMOTS_sig(message, MHWD, MSLC, MPRT, LMID, MSLT, MNUM, S)
    Byteprint("\nCandidate LMOTS pub key: ", candidate)
 
-   cand_node = SHA256(candidate+LMID+bytstr(2**THGT+LMS_sig[2])+'\x03').digest()
+   cand_node = SHA256(candidate+LMID+bytstr(2**THGT+MNUM)+'\x03').digest() # D_LEAF = '\x03'
    Byteprint("\nCandidate node value: ", cand_node)
 
-   T1 = LMS_calc_root(cand_node, LMID, 2**THGT+LMS_sig[2], LMS_sig[4])
+   T1 = LMS_calc_root(cand_node, LMID, 2**THGT+MNUM, T)
    Byteprint("\nCandidate root (pub key): ", T1)
    Byteprint("\nTrue public key: ", LMS_pubkey)
 

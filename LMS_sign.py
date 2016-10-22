@@ -56,26 +56,6 @@ def calc_ls(n, w, sumbits):
    return int(shftl)
 
 
-def calc_LMOTSprvkey(LMSprvkey, LMID, n, MPRT, MNUM):
-   '''Calculate one LMOTS private key (list) from the LMS private key (seed)'''
-
-   # Generate per-message LMOTS seed from LMS private key
-
-   string = "LMOTS"+bytstr(0,1)+LMID+bytstr(MNUM,4)+bytstr(n*8,2)
-   OTSprvseed = HMAC.new(LMSprvkey, string, SHA256).digest()
-   Byteprint("\nLMOTS seed: ", OTSprvseed)     # debug
-
-   # Generate per-message p-element LMOTS private key
-
-   LMOTSprvkey = []
-   for i in xrange(0, MPRT):
-     string = bytstr(i,4)+"LMS"+bytstr(0,1)+LMID+bytstr(MNUM,4)+bytstr(n*8,2)
-     LMOTSprvkey.append(SHA256(OTSprvseed+string).digest())
-     Byteprint("\nX["+str(i)+"] = ", LMOTSprvkey[i])     # debug
-
-   return LMOTSprvkey
-
-
 def update_state(req_MNUM):
    '''Get current state and store new state'''
 
@@ -83,17 +63,19 @@ def update_state(req_MNUM):
 
    statefile = open("statefile", "r+b")
    current_state = struct.unpack('>I', statefile.read(4))[0]
+   statefile.seek(0)
 
-   if req_MNUM < 0:
-      statefile.write(bytstr(current_state+1, 4))
+   if req_MNUM < 0:     # Test mode - do not update state
       return current_state
    elif req_MNUM < current_state:
       print "Your attempt to sign with a used key has been reported to the authorities."
    elif req_MNUM == current_state:
       statefile.write(bytstr(current_state+1, 4))
+      statefile.close()
       return current_state
    elif req_MNUM > current_state:
       statefile.write(bytstr(req_MNUM+1, 4))
+      statefile.close()
       return req_MNUM
       
 
@@ -118,6 +100,26 @@ def cksm(MHSH, n, w):
    return csum<<calc_ls(n, w, 16)
 
 
+def calc_LMOTSprvkey(LMSprvkey, LMID, n, MPRT, MNUM):
+   '''Calculate one LMOTS private key (list) from the LMS private key (seed)'''
+
+   # Generate per-message LMOTS seed from LMS private key
+# >>>>>
+   string = "LMOTS"+bytstr(0,1)+LMID+bytstr(MNUM,4)+bytstr(n*8,2)
+   OTSprvseed = HMAC.new(LMSprvkey, string, SHA256).digest()
+   Byteprint("\nLMOTS seed: ", OTSprvseed)     # debug
+
+   # Generate per-message p-element LMOTS private key
+
+   LMOTSprvkey = []
+   for i in xrange(0, MPRT):
+     string = bytstr(i,4)+"LMS"+bytstr(0,1)+LMID+bytstr(MNUM,4)+bytstr(n*8,2)
+     LMOTSprvkey.append(SHA256(OTSprvseed+string).digest())
+     Byteprint("\nX["+str(i)+"] = ", LMOTSprvkey[i])     # debug
+
+   return LMOTSprvkey
+
+
 def LMS_calc_OTsig(message, LMSprvkey, LMID, MHWD, MSLC, MNUM):
 
    D_ITER = '\x00'
@@ -138,6 +140,7 @@ def LMS_calc_OTsig(message, LMSprvkey, LMID, MHWD, MSLC, MNUM):
       tmp = LMOTSprvkey[i]
       for j in xrange(0, a):
          tmp = SHA256(tmp+LMID+bytstr(MNUM,4)+bytstr(i,2)+bytstr(j,2)+D_ITER).digest()
+         Byteprint("Chain "+str(i)+", element "+str(j)+": ", tmp)
       s.append(tmp)
 
    return MSLT,s
@@ -182,7 +185,7 @@ def LMS_retrieve_node_vals(PATH):
 def LMS_sign(msgfn):
 
    import struct
-   from typecode_registry import *
+   import typecode_registry
 
 # Read typecode and LMS private key from storage
 
@@ -199,6 +202,7 @@ def LMS_sign(msgfn):
    keyfile.close()
 
    Byteprint("\nLMS private key: ", LMSprvkey)
+   Byteprint("\nLMID: ", LMID)
 
 # Read message
 
@@ -206,9 +210,9 @@ def LMS_sign(msgfn):
    message = msgfile.read()
    msgfile.close()
 
-   MHWD = LMOTS_parms[LMOTS_typecode][0]
-   MSLC = LMOTS_parms[LMOTS_typecode][1]
-   THGT = LMS_parms[LMS_typecode][1]
+   MHWD = typecode_registry.LMOTS_parms[LMOTS_typecode][0]
+   MSLC = typecode_registry.LMOTS_parms[LMOTS_typecode][1]
+   THGT = typecode_registry.LMS_parms[LMS_typecode][1]
 
    MNUM = update_state(-1)
 
