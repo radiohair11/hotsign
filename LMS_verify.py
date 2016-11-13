@@ -21,19 +21,19 @@ def bytstr(num, bytlen=4):
    return bits[-bytlen:]
 
 
-def calc_p(n, w):
+def calc_p(MHWD, MSLC):
    '''Calculate the number of w-bit substrings in the message hash + checksum.'''
-   u = math.ceil(8 * n / w)
-   v = math.ceil((math.floor(math.log((2**w - 1) * u, 2)) + 1) / w)
+   u = math.ceil(8 * MHWD / MSLC)
+   v = math.ceil((math.floor(math.log((2**MSLC - 1) * u, 2)) + 1) / MSLC)
    p = u+v
    return int(p)
 
 
-def calc_ls(n, w, sumbits):
+def calc_ls(MHWD, MSLC, sumbits):
    '''Calc number of left shift bits for checksum'''
-   u = math.ceil(8 * n / w)
-   v = math.ceil((math.floor(math.log((2**w - 1) * u, 2)) + 1) / w)
-   shftl = sumbits - (v*w)
+   u = math.ceil(8 * MHWD / MSLC)
+   v = math.ceil((math.floor(math.log((2**MSLC - 1) * u, 2)) + 1) / MSLC)
+   shftl = sumbits - (v*MSLC)
    return int(shftl)
 
 
@@ -78,25 +78,25 @@ def LMS_read_sig(sigfn):
 
    return LMS_typecode, MSLT, MNUM, S, T, MHWD, MSLC, MPRT
 
-def coef(string, index, w):
+def coef(string, index, MSLC):
    '''Calculate the 'i'th w-bit slice of string'''
    import array
 
    bytes = array.array('B', string)
-   MASK = 2**w-1
-   NBYT = int(index*w/8)
+   MASK = 2**MSLC-1
+   NBYT = int(index*MSLC/8)
    OPND = bytes[NBYT]
-   RSFT = 8 - (w*(index%(8/w))+w)
+   RSFT = 8 - (MSLC*(index%(8/MSLC))+MSLC)
    return MASK&(OPND>>RSFT)
 
 
-def cksm(MHSH, n, w):
+def cksm(MHSH, MHWD, MSLC):
    '''Calculate checksum (section 4.6)'''
    csum = 0
-   u = int(math.ceil(8 * n / w))
+   u = int(math.ceil(8 * MHWD / MSLC))
    for i in xrange(0, u):
-      csum = csum + (2**w-1) - coef(MHSH, i, w)
-   return csum<<calc_ls(n, w, 16)
+      csum = csum + (2**MSLC-1) - coef(MHSH, i, MSLC)
+   return csum<<calc_ls(MHWD, MSLC, 16)
 
 
 def LMS_verify_LMOTS_sig(message, MHWD, MSLC, MPRT, LMID, MSLT, MNUM, S):

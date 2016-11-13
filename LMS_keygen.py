@@ -28,12 +28,12 @@ def LMS_genprvkey(typecode, string):
       return LMSprvkey
 
 
-def calc_LMOTSprvkey(LMSprvkey, LMID, n, MPRT, MNUM):
+def calc_LMOTSprvkey(LMSprvkey, LMID, MHWD, MPRT, MNUM):
    '''Calculate one LMOTS private key (list) from the LMS private key (seed)'''
 
    # Generate per-message LMOTS seed from LMS private key
 
-   string = "LMOTS"+bytstr(0,1)+LMID+bytstr(MNUM,4)+bytstr(n*8,2)
+   string = "LMOTS"+bytstr(0,1)+LMID+bytstr(MNUM,4)+bytstr(MHWD*8,2)
    OTSprvseed = HMAC.new(LMSprvkey, string, SHA256).digest()
    Byteprint("\nLMOTS seed: ", OTSprvseed)     # debug
 
@@ -41,14 +41,14 @@ def calc_LMOTSprvkey(LMSprvkey, LMID, n, MPRT, MNUM):
 
    LMOTSprvkey = []
    for i in xrange(0, MPRT):
-     string = bytstr(i,4)+"LMS"+bytstr(0,1)+LMID+bytstr(MNUM,4)+bytstr(n*8,2)
+     string = bytstr(i,4)+"LMS"+bytstr(0,1)+LMID+bytstr(MNUM,4)+bytstr(MHWD*8,2)
      LMOTSprvkey.append(SHA256(OTSprvseed+string).digest())
      Byteprint("\nX["+str(i)+"] = ", LMOTSprvkey[i])     # debug
 
    return LMOTSprvkey
 
 
-def calc_LMOTSpubkey(LMSprvkey, LMID, n, w, MNUM):
+def calc_LMOTSpubkey(LMSprvkey, LMID, MHWD, MSLC, MNUM):
    '''Calculate one LMOTS public key from the LMS private key (seed).'''
 
    D_ITER = '\x00'
@@ -56,15 +56,15 @@ def calc_LMOTSpubkey(LMSprvkey, LMID, n, w, MNUM):
 
    # Generate per-message LMOTS seed from LMS private key
 
-   MPRT = calc_p(n, w)
-   LMOTSprvkey = calc_LMOTSprvkey(LMSprvkey, LMID, n, MPRT, MNUM)
+   MPRT = calc_p(MHWD, MSLC)
+   LMOTSprvkey = calc_LMOTSprvkey(LMSprvkey, LMID, MHWD, MPRT, MNUM)
 
    # Generate per-message p-element LMOTS public key vector
 
    y = []
    for i in xrange(0, MPRT):
      tmp = LMOTSprvkey[i]
-     for j in xrange(0, 2**w-1):
+     for j in xrange(0, 2**MSLC-1):
        tmp = SHA256(tmp+LMID+bytstr(MNUM,4)+bytstr(i,2)+bytstr(j,2)+D_ITER).digest()
      y.append(tmp)
 
@@ -78,7 +78,7 @@ def calc_LMOTSpubkey(LMSprvkey, LMID, n, w, MNUM):
    return Y.digest()
 
 
-def calc_LMS_pub(h, LMID, OTSpubkeys):
+def calc_LMS_pub(THGT, LMID, OTSpubkeys):
    '''Calculate the n-byte LMS public key from a set n-byte LMOTS public keys.'''
 
    nodefile = open("nodefile", "wb", 0)
@@ -90,10 +90,10 @@ def calc_LMS_pub(h, LMID, OTSpubkeys):
    I = []   # integer stack
    NODES = []
 
-   for i in xrange(0, 2**h, 2):
+   for i in xrange(0, 2**THGT, 2):
       level = 0
       for j in xrange(0, 2):
-         NODN = 2**h+i+j
+         NODN = 2**THGT+i+j
          print "\ni = ", i,"j = ",j,"Leaf node number = ", NODN     # debug
          NODV = SHA256(OTSpubkeys[i+j]+LMID+bytstr(NODN)+D_LEAF).digest()
          Byteprint("NODV: ",NODV)     # debug
@@ -113,7 +113,7 @@ def calc_LMS_pub(h, LMID, OTSpubkeys):
                level = I.pop()
                print "I = ",I, "level = ", level     # debug
             TMP.update(siblings)
-            NODN = (2**h+i)/(2**(level+1))
+            NODN = (2**THGT+i)/(2**(level+1))
             print "Tree node number: ", NODN     # debug
             TMP.update(LMID+bytstr(NODN)+D_INTR)
             NODV = TMP.digest()
@@ -131,35 +131,35 @@ def calc_LMS_pub(h, LMID, OTSpubkeys):
    return D.pop()
 
 
-def LMS_genpubkey(LMSprvkey, h, n, w, LMID):
+def LMS_genpubkey(LMSprvkey, THGT, MHWD, MSLC, LMID):
 
    OTSpubkeys = []
 
-   for i in xrange(0, 2**h):
-      OTSpubkeys.append(calc_LMOTSpubkey(LMSprvkey, LMID, n, w, i))
+   for i in xrange(0, 2**THGT):
+      OTSpubkeys.append(calc_LMOTSpubkey(LMSprvkey, LMID, MHWD, MSLC, i))
 
    #---------- Print statements for debug ----------
-   for i in xrange(0, 2**h):
+   for i in xrange(0, 2**THGT):
       Byteprint("\nLMOTS public key ["+str(i)+"] = ", OTSpubkeys[i])
    #---------- Print statements for debug ----------
 
 
    # Generate LMS public key (calc hash tree)
 
-   LMSpubkey = calc_LMS_pub(h, LMID, OTSpubkeys)
+   LMSpubkey = calc_LMS_pub(THGT, LMID, OTSpubkeys)
    return LMSpubkey
 
 # ===== MAIN FUNCTION ===== # ===== MAIN FUNCTION ===== #
 
-def LMS_keygen(n, w, h):
+def LMS_keygen(MHWD, MSLC, THGT):
 
    # from LMOTS_SHA256_N32_W4 import *
    # h = 4
 
    import typecode_registry
 
-   LMOTS_name = "LMOTS_SHA256_N"+str(n)+"_W"+str(w)
-   LMS_name = "LMS_SHA256_N"+str(n)+"_H"+str(h)
+   LMOTS_name = "LMOTS_SHA256_N"+str(MHWD)+"_W"+str(MSLC)
+   LMS_name = "LMS_SHA256_N"+str(MHWD)+"_H"+str(THGT)
    LMOTS_typecode = typecode_registry.LMOTS_typecodes[LMOTS_name]
    LMS_typecode = typecode_registry.LMS_typecodes[LMS_name]
    MHWD = typecode_registry.LMOTS_parms[LMOTS_typecode][0]

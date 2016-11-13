@@ -40,19 +40,19 @@ def bytstr(num, bytlen=4):
    return bits[-bytlen:]
 
 
-def calc_p(n, w):
+def calc_p(MHWD, MSLC):
    '''Calculate the number of w-bit substrings in the message hash + checksum.'''
-   u = math.ceil(8 * n / w)
-   v = math.ceil((math.floor(math.log((2**w - 1) * u, 2)) + 1) / w)
+   u = math.ceil(8 * MHWD / MSLC)
+   v = math.ceil((math.floor(math.log((2**MSLC - 1) * u, 2)) + 1) / MSLC)
    p = u+v
    return int(p)
 
 
-def calc_ls(n, w, sumbits):
+def calc_ls(MHWD, MSLC, sumbits):
    '''Calc number of left shift bits for checksum'''
-   u = math.ceil(8 * n / w)
-   v = math.ceil((math.floor(math.log((2**w - 1) * u, 2)) + 1) / w)
-   shftl = sumbits - (v*w)
+   u = math.ceil(8 * MHWD / MSLC)
+   v = math.ceil((math.floor(math.log((2**MSLC - 1) * u, 2)) + 1) / MSLC)
+   shftl = sumbits - (v*MSLC)
    return int(shftl)
 
 
@@ -79,33 +79,33 @@ def update_state(req_MNUM):
       return req_MNUM
       
 
-def coef(string, index, w):
+def coef(string, index, MSLC):
    '''Calculate the 'i'th w-bit slice of string'''
    import array
 
    bytes = array.array('B', string)
-   MASK = 2**w-1
-   NBYT = int(index*w/8)
+   MASK = 2**MSLC-1
+   NBYT = int(index*MSLC/8)
    OPND = bytes[NBYT]
-   RSFT = 8 - (w*(index%(8/w))+w)
+   RSFT = 8 - (MSLC*(index%(8/MSLC))+MSLC)
    return MASK&(OPND>>RSFT)
 
 
-def cksm(MHSH, n, w):
+def cksm(MHSH, MHWD, MSLC):
    '''Calculate checksum (section 4.6)'''
    csum = 0
-   u = int(math.ceil(8 * n / w))
+   u = int(math.ceil(8 * MHWD / MSLC))
    for i in xrange(0, u):
-      csum = csum + (2**w-1) - coef(MHSH, i, w)
-   return csum<<calc_ls(n, w, 16)
+      csum = csum + (2**MSLC-1) - coef(MHSH, i, MSLC)
+   return csum<<calc_ls(MHWD, MSLC, 16)
 
 
-def calc_LMOTSprvkey(LMSprvkey, LMID, n, MPRT, MNUM):
+def calc_LMOTSprvkey(LMSprvkey, LMID, MHWD, MPRT, MNUM):
    '''Calculate one LMOTS private key (list) from the LMS private key (seed)'''
 
    # Generate per-message LMOTS seed from LMS private key
 
-   string = "LMOTS"+bytstr(0,1)+LMID+bytstr(MNUM,4)+bytstr(n*8,2)
+   string = "LMOTS"+bytstr(0,1)+LMID+bytstr(MNUM,4)+bytstr(MHWD*8,2)
    OTSprvseed = HMAC.new(LMSprvkey, string, SHA256).digest()
    Byteprint("\nLMOTS seed: ", OTSprvseed)     # debug
 
@@ -113,7 +113,7 @@ def calc_LMOTSprvkey(LMSprvkey, LMID, n, MPRT, MNUM):
 
    LMOTSprvkey = []
    for i in xrange(0, MPRT):
-     string = bytstr(i,4)+"LMS"+bytstr(0,1)+LMID+bytstr(MNUM,4)+bytstr(n*8,2)
+     string = bytstr(i,4)+"LMS"+bytstr(0,1)+LMID+bytstr(MNUM,4)+bytstr(MHWD*8,2)
      LMOTSprvkey.append(SHA256(OTSprvseed+string).digest())
      Byteprint("\nX["+str(i)+"] = ", LMOTSprvkey[i])     # debug
 
@@ -144,10 +144,10 @@ def LMS_calc_OTsig(message, LMSprvkey, LMID, MHWD, MSLC, MNUM):
 
    return MSLT,s
 
-def LMS_discover_path(h, MNUM):
+def LMS_discover_path(THGT, MNUM):
    '''Create a list of off-branch node numbers'''
    PATH = []
-   node_num = 2**h+MNUM
+   node_num = 2**THGT+MNUM
    while node_num > 1:
       if node_num % 2 == 0:
          node_num = node_num + 1

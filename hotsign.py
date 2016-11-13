@@ -21,24 +21,24 @@ try:
          EXIT(1)
 
       print "\nGenerating key..."
-      n = 32; w = 4; h = 5     # Set defaults
+      MHWD = 32; MSLC = 4; THGT = 5     # Set defaults
       for i in range(1, len(args), 2):
          if args[i] == '-n':
             if args[i+1] == '16' or args[i+1] == '32':
-               n = int(args[i+1])
+               MHWD = int(args[i+1])
             else:
                print "\nHash width 'n' must be 16 or 32 bytes."
                EXIT(1)
          elif args[i] == '-w':
             if (args[i+1] == '1' or args[i+1] == '2' or
                 args[i+1] == '4' or args[i+1] == '8'):
-               w = int(args[i+1])
+               MSLC = int(args[i+1])
             else:
                print "\nPartition width 'w' must be 1, 2, 4, or 8."
                EXIT(1)
          elif args[i] == '-h':
             if args[i+1] == '5' or args[i+1] == '10' or args[i+1] == '20':
-               h = int(args[i+1])
+               THGT = int(args[i+1])
             else:
                print "\nTree height 'h' must be 5, 10, or 20."
                EXIT(1)
@@ -46,7 +46,7 @@ try:
             print "Unrecognized parameter."
             
       from LMS_keygen import LMS_keygen
-      LMS_keygen(n, w, h)
+      LMS_keygen(MHWD, MSLC, THGT)
       print "\n... Done."
 
    elif args[0] == "sign":
