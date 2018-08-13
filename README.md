@@ -1,7 +1,5 @@
 # hotsign
-**hotsign** is a poor but possibly correct Python implementation of the LMS hash-based signature scheme described in the Internet-Draft ["Hash Based Signatures"] (https://www.ietf.org/archive/id/draft-mcgrew-hash-sigs-04.txt)<draft-mcgrew-hash-sigs>.
-
-NOTE: This README describes an objective for the code in this repository. The code as it currently exists will not perform what is described here. If you are reading this, it means you're being paid to do so, or need to find something better to do. Go outside and get some fresh air, why don'cha.
+**hotsign** is a Python implementation of the LMS hash-based signature scheme described in the Internet-Draft ["Hash Based Signatures"] (https://www.ietf.org/archive/id/draft-mcgrew-hash-sigs-04.txt)<draft-mcgrew-hash-sigs>.
 
 Manifest:
 
