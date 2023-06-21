@@ -3,16 +3,17 @@
 import math
 import random
 import binascii
+#from hashlib import sha256 as SHA256
 
 
 def Byteprint(caption, hexstr, linelen=16):
    '''Byteprint pretty prints hex strings with leading caption'''
-   lines = int(math.ceil(len(hexstr)/float(linelen)))
-   print caption
+   lines = int(math.ceil(len(hexstr.digest())/float(linelen)))
+   print(caption)
    for i in range (0, lines):
       start = 0+i*linelen
       end = i*linelen+linelen
-      print "   ",' '.join(x.encode('hex')for x in hexstr[start:end])
+      print("   ",' '.join(x.encode('hex')for x in hexstr.digest()[start:end]))
 
 def bytstr(x, bytlen=4):
   '''bytstr returns the binary rep'n of x in bytlen bytes with 0s prefixed'''

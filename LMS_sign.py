@@ -27,11 +27,11 @@ import binascii
 def Byteprint(caption, hexstr, linelen=16):
    '''Pretty print hex strings with leading caption.'''
    lines = int(math.ceil(len(hexstr)/float(linelen)))
-   print caption
+   print(caption)
    for i in range (0, lines):
       start = 0+i*linelen
       end = i*linelen+linelen
-      print "   ",' '.join(x.encode('hex')for x in hexstr[start:end])
+      print("   ",' '.join(x.encode('hex')for x in hexstr[start:end]))
 
 
 def bytstr(num, bytlen=4):
@@ -68,7 +68,7 @@ def update_state(req_MNUM):
    if req_MNUM < 0:     # Test mode - do not update state
       return current_state
    elif req_MNUM < current_state:
-      print "Your attempt to sign with a used key has been reported to the authorities."
+      print("Your attempt to sign with a used key has been reported to the authorities.")
    elif req_MNUM == current_state:
       statefile.write(bytstr(current_state+1, 4))
       statefile.close()
@@ -95,7 +95,7 @@ def cksm(MHSH, MHWD, MSLC):
    '''Calculate checksum (section 4.6)'''
    csum = 0
    u = int(math.ceil(8 * MHWD / MSLC))
-   for i in xrange(0, u):
+   for i in range(0, u):
       csum = csum + (2**MSLC-1) - coef(MHSH, i, MSLC)
    return csum<<calc_ls(MHWD, MSLC, 16)
 
@@ -112,7 +112,7 @@ def calc_LMOTSprvkey(LMSprvkey, LMID, MHWD, MPRT, MNUM):
    # Generate per-message p-element LMOTS private key
 
    LMOTSprvkey = []
-   for i in xrange(0, MPRT):
+   for i in range(0, MPRT):
      string = bytstr(i,4)+"LMS"+bytstr(0,1)+LMID+bytstr(MNUM,4)+bytstr(MHWD*8,2)
      LMOTSprvkey.append(SHA256(OTSprvseed+string).digest())
      Byteprint("\nX["+str(i)+"] = ", LMOTSprvkey[i])     # debug
@@ -135,10 +135,10 @@ def LMS_calc_OTsig(message, LMSprvkey, LMID, MHWD, MSLC, MNUM):
    LMOTSprvkey = calc_LMOTSprvkey(LMSprvkey, LMID, MHWD, MPRT, MNUM)
 
    s = []
-   for i in xrange(0, MPRT):
+   for i in range(0, MPRT):
       a = coef(MHCS, i, MSLC)
       tmp = LMOTSprvkey[i]
-      for j in xrange(0, a):
+      for j in range(0, a):
          tmp = SHA256(tmp+LMID+bytstr(MNUM,4)+bytstr(i,2)+bytstr(j,2)+D_ITER).digest()
       s.append(tmp)
 
@@ -153,7 +153,7 @@ def LMS_discover_path(THGT, MNUM):
          node_num = node_num + 1
       else:
          node_num = node_num - 1
-      print "node_num: ", node_num     # debug
+      print("node_num: ", node_num)     # debug
       PATH.append(node_num)
       node_num = node_num//2
    return PATH

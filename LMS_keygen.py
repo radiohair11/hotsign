@@ -11,21 +11,23 @@ from LMS_func import *   # Byteprint, bytstr, calc_p, and calc_ls
 def LMS_genprvkey(typecode, string):
 
    if os.path.exists("keyfile") or os.path.exists("statefile"):
-      print "\nSignature scheme already initialized.\n"
+      print("\nSignature scheme already initialized.\n")
       os._exit(1)
    else:
       # Generate LMS private key
-      LMSseed = bytstr(random.getrandbits(256),32)
-      LMSprvkey = HMAC.new(LMSseed, string+'LMSprvkey', SHA256).digest()
+      LMSseed = bytstr(random.getrandbits(256))
+      # LMSseed = (random.getrandbits(256)).to_bytes(32, 'big')
+      msg = string+'LMSprvkey'
+      LMSprvkey = HMAC.new(LMSseed, msg.encode(), SHA256)
       prvkeyfile = open("prvkeyfile","wb",0)
-      prvkeyfile.write(bytstr(typecode, 4)+LMSprvkey)
+      prvkeyfile.write(bytstr(typecode, 4)+LMSprvkey.digest())
       # Initialize state file
-      statefile = open("statefile","w",0)
+      statefile = open("statefile","wb",0)
       statefile.write(bytstr(0, 4))
       # Cleanup and return
       prvkeyfile.close()
       statefile.close()
-      return LMSprvkey
+      return LMSprvkey  
 
 
 def calc_LMOTSprvkey(LMSprvkey, LMID, MHWD, MPRT, MNUM):
@@ -33,17 +35,18 @@ def calc_LMOTSprvkey(LMSprvkey, LMID, MHWD, MPRT, MNUM):
 
    # Generate per-message LMOTS seed from LMS private key
 
-   string = "LMOTS"+bytstr(0,1)+LMID+bytstr(MNUM,4)+bytstr(MHWD*8,2)
-   OTSprvseed = HMAC.new(LMSprvkey, string, SHA256).digest()
-   Byteprint("\nLMOTS seed: ", OTSprvseed)     # debug
+   msg = "LMOTS" + (bytstr(0,1)).hex() + LMID + (bytstr(MNUM,4)).hex() + (bytstr(MHWD*8,2)).hex()
+   OTSprvseed = HMAC.new(LMSprvkey.digest(), msg.encode(), SHA256)
+   print("\nLMOTS seed: ", (OTSprvseed.digest()).hex())     # debug
 
    # Generate per-message p-element LMOTS private key
 
    LMOTSprvkey = []
-   for i in xrange(0, MPRT):
-     string = bytstr(i,4)+"LMS"+bytstr(0,1)+LMID+bytstr(MNUM,4)+bytstr(MHWD*8,2)
-     LMOTSprvkey.append(SHA256(OTSprvseed+string).digest())
-     Byteprint("\nX["+str(i)+"] = ", LMOTSprvkey[i])     # debug
+   for i in range(0, MPRT):
+     string = (bytstr(i,4)).hex() + "LMS" + (bytstr(0,1)).hex() + LMID + (bytstr(MNUM,4)).hex() + (bytstr(MHWD*8,2)).hex()
+     LMOTSprvkey.append(SHA256(((OTSprvseed.digest()).hex() + string).encode()).digest())
+     print("\nX[" + i.__str__() + "] = " + (LMOTSprvkey[i]).hex())
+     #Byteprint("\nX["+str(i)+"] = ", LMOTSprvkey[i])     # debug
 
    return LMOTSprvkey
 
@@ -62,19 +65,20 @@ def calc_LMOTSpubkey(LMSprvkey, LMID, MHWD, MSLC, MNUM):
    # Generate per-message p-element LMOTS public key vector
 
    y = []
-   for i in xrange(0, MPRT):
+   for i in range(0, MPRT):
      tmp = LMOTSprvkey[i]
-     for j in xrange(0, 2**MSLC-1):
-       tmp = SHA256(tmp+LMID+bytstr(MNUM,4)+bytstr(i,2)+bytstr(j,2)+D_ITER).digest()
+     for j in range(0, 2**MSLC-1):
+       string = tmp.hex() + LMID + (bytstr(MNUM,4)).hex() + (bytstr(i,2)).hex() + (bytstr(j,2)).hex() + D_ITER
+       tmp = SHA256(string.encode()).digest()
      y.append(tmp)
 
    # Generate per-message n-byte LMOTS public key
 
    Y = SHA256()
-   Y.update(LMID+bytstr(MNUM,4))
-   for i in xrange(0, MPRT):
+   Y.update((LMID + (bytstr(MNUM,4)).hex()).encode())
+   for i in range(0, MPRT):
      Y.update(y[i])
-   Y.update(D_PBLC)
+   Y.update(D_PBLC.encode())
    return Y.digest()
 
 
@@ -90,38 +94,55 @@ def calc_LMS_pub(THGT, LMID, OTSpubkeys):
    I = []   # integer stack
    NODES = []
 
-   for i in xrange(0, 2**THGT, 2):
+   for i in range(0, 2**THGT, 2):
       level = 0
-      for j in xrange(0, 2):
+      for j in range(0, 2):
          NODN = 2**THGT+i+j
-         print "\ni = ", i,"j = ",j,"Leaf node number = ", NODN     # debug
-         NODV = SHA256(OTSpubkeys[i+j]+LMID+bytstr(NODN)+D_LEAF).digest()
-         Byteprint("NODV: ",NODV)     # debug
+         print("\ni = ", i,"j = ",j,"Leaf node number = ", NODN)     # debug
+         string = (OTSpubkeys[i+j]).hex() + LMID + (bytstr(NODN)).hex() + D_LEAF
+         NODV = SHA256(string.encode()).digest()
+         #Byteprint("NODV: ",NODV)     # debug
+         print("NODV: " + NODV.hex())
          NODES.append([NODN, NODV])
          D.append(NODV)
-         print "   Leaf ",i+j," pushed onto data stack."     # debug
+         print("   Leaf ",i+j," pushed onto data stack.")     # debug
          
          I.append(level)
-         print "j loop: I, len(I) = ",I, len(I)     # debug
+         print("j loop: I, len(I) = ",I, len(I))     # debug
       while len(I) >= 2:
          if I[-2] == I[-1]:
             TMP = SHA256()
-            siblings = ""
+            #siblings = ""
+            siblings = []
             for k in (1, 2):
-               siblings = D.pop()+siblings
-               print "Child value popped from data stack."     #debug
+               # siblings = D.pop()+siblings
+               # first, make siblings a list. can't cat strings and list objects
+               # second, it looks like D.pop() needs to go at the front of the list of siblings so...
+               # 1. reverse the list of siblings; [1, 2, 3, 4, 5] => [5, 4, 3, 2, 1]
+               # 2. append D.pop() to the list; [5, 4, 3, 2, 1] => [5, 4, 3, 2, 1, D.pop()]
+               # 3. cat all the list objects together into one big byte array
+               # 4. reverse the byte array
+
+               siblings.reverse()
+               siblings.append(D.pop())
+             
+               print ("Child value popped from data stack.")     #debug
                level = I.pop()
-               print "I = ",I, "level = ", level     # debug
-            TMP.update(siblings)
+               print("I = ",I, "level = ", level)     # debug
+            #need to cat the entire list of siblings together
+            for i in (0, len(siblings)-1):
+               siblings[i] += siblings[i+1]
+            siblings[0].reverse()
+            TMP.update(siblings[0])
             NODN = (2**THGT+i)/(2**(level+1))
-            print "Tree node number: ", NODN     # debug
+            print("Tree node number: ", NODN)     # debug
             TMP.update(LMID+bytstr(NODN)+D_INTR)
             NODV = TMP.digest()
             NODES.append([NODN, NODV])
             D.append(NODV)
-            print "Two child values hashed and pushed on data stack."     # debug
+            print("Two child values hashed and pushed on data stack.")     # debug
             I.append(level+1)
-            print "while loop: I, len(I) = ", I, len(I)     # debug
+            print("while loop: " + I + "len(I) = ", len(I))     # debug
          else:
             break
    NODES.sort()
@@ -131,16 +152,17 @@ def calc_LMS_pub(THGT, LMID, OTSpubkeys):
    return D.pop()
 
 
-def LMS_genpubkey(LMSprvkey, THGT, MHWD, MSLC, LMID):
+def LMS_genpubkey(LMSprvkey, THGT, MHWD, MSLC, LMID):    #hmac obj, string, string, string, hex string
 
    OTSpubkeys = []
 
-   for i in xrange(0, 2**THGT):
+   for i in range(0, 2**THGT):
       OTSpubkeys.append(calc_LMOTSpubkey(LMSprvkey, LMID, MHWD, MSLC, i))
 
    #---------- Print statements for debug ----------
-   for i in xrange(0, 2**THGT):
-      Byteprint("\nLMOTS public key ["+str(i)+"] = ", OTSpubkeys[i])
+   for i in range(0, 2**THGT):
+      #Byteprint("\nLMOTS public key ["+str(i)+"] = ", OTSpubkeys[i])
+      print("\nLMOTS public key [" + i.__str__() + "] = " + (OTSpubkeys[i]).hex())
    #---------- Print statements for debug ----------
 
 
@@ -170,14 +192,15 @@ def LMS_keygen(MHWD, MSLC, THGT):
 # Generate private key and state and store to file
 
    LMSprvkey = LMS_genprvkey(LMOTS_typecode, LMOTS_name+LMS_name)
-   Byteprint("\nLMS private key: ", LMSprvkey)     # debug
+   print("\nLMS private key: " + (LMSprvkey.digest()).hex())
 
-   tmp = HMAC.new(LMSprvkey, LMOTS_name+LMS_name+"LMID", SHA256).digest()
-   LMID = tmp[0:31]
-   Byteprint("\nLMID: ", LMID)
+   msg = LMOTS_name+LMS_name+"LMID"
+   tmp = HMAC.new(LMSprvkey.digest(), msg.encode(), SHA256)#.digest()
+   LMID = tmp.digest()[0:31]
+   print("\nLMID: " + LMID.hex())
 
-   LMSpubkey = LMS_genpubkey(LMSprvkey, THGT, MHWD, MSLC, LMID)
-   Byteprint("\nLMS public key: ", LMSpubkey)     #debug
+   LMSpubkey = LMS_genpubkey(LMSprvkey, THGT, MHWD, MSLC, LMID.hex())
+   print("\nLMS public key: ", (LMSpubkey.digest()).hex())     #debug
 
 # Write out LMS public key (u32str(type)||I||T[1])
 

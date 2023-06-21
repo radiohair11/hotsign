@@ -8,11 +8,11 @@ import binascii
 def Byteprint(caption, hexstr, linelen=16):
    '''Pretty print hex strings with leading caption.'''
    lines = int(math.ceil(len(hexstr)/float(linelen)))
-   print caption
+   print(caption)
    for i in range (0, lines):
       start = 0+i*linelen
       end = i*linelen+linelen
-      print "   ",' '.join(x.encode('hex')for x in hexstr[start:end])
+      print("   ",' '.join(x.encode('hex')for x in hexstr[start:end]))
 
 
 def bytstr(num, bytlen=4):
@@ -65,7 +65,7 @@ def LMS_read_sig(sigfn):
    MPRT = calc_p(MHWD, MSLC)
 
    S = []
-   for i in xrange(0,MPRT):
+   for i in range(0,MPRT):
       S.append(sigfile.read(32))
 
    T = []
@@ -94,7 +94,7 @@ def cksm(MHSH, MHWD, MSLC):
    '''Calculate checksum (section 4.6)'''
    csum = 0
    u = int(math.ceil(8 * MHWD / MSLC))
-   for i in xrange(0, u):
+   for i in range(0, u):
       csum = csum + (2**MSLC-1) - coef(MHSH, i, MSLC)
    return csum<<calc_ls(MHWD, MSLC, 16)
 
@@ -109,16 +109,16 @@ def LMS_verify_LMOTS_sig(message, MHWD, MSLC, MPRT, LMID, MSLT, MNUM, S):
    MHCS = MHSH+bytstr(cksm(MHSH, MHWD, MSLC))
 
    z = []
-   for i in xrange(0, MPRT):
+   for i in range(0, MPRT):
       a = coef(MHCS, i, MSLC)
       tmp = S[i]
-      for j in xrange(a, 2**MSLC-1):
+      for j in range(a, 2**MSLC-1):
          tmp = SHA256(tmp+LMID+bytstr(MNUM,4)+bytstr(i,2)+bytstr(j,2)+D_ITER).digest()
       z.append(tmp)
 
    Z = SHA256()
    Z.update(LMID+bytstr(MNUM,4))
-   for i in xrange(0, MPRT):
+   for i in range(0, MPRT):
      Z.update(z[i])
    Z.update(D_PBLC)
    return Z.digest()
@@ -130,7 +130,7 @@ def LMS_calc_root(cand_node, LMID, NODN, T):
    T.reverse()
    tmp = cand_node
    while NODN > 1:
-      print "Node number: ", NODN     #debug
+      print("Node number: ", NODN)     #debug
       if NODN % 2 == 0:
          tmp = SHA256(tmp+T.pop()+LMID+bytstr(NODN//2, 4)+D_INTR).digest()
       else:
@@ -148,7 +148,7 @@ def LMS_verify(msgfn, sigfn):
 
    LMS_typecode_key, LMID, LMS_pubkey = LMS_read_pubkey()
 
-   print "Public key type: ", LMS_typecode_key      # debug
+   print("Public key type: ", LMS_typecode_key)      # debug
    Byteprint("LMID: ",LMID)     # debug
    Byteprint("LMS public key: ", LMS_pubkey)     # debug
 
@@ -162,18 +162,18 @@ def LMS_verify(msgfn, sigfn):
 
    LMS_typecode_sig, MSLT, MNUM, S, T, MHWD, MSLC, MPRT= LMS_read_sig(sigfn)
 
-   print "\nLMS typecode: ", LMS_typecode_sig #LMS_typecode     # debug
+   print("\nLMS typecode: ", LMS_typecode_sig) #LMS_typecode     # debug
 #   print "LMOTS typecode: ", LMOTS_typecode     # debug
    Byteprint("Message salt: ", MSLT)     # debug
-   print "Message number: ", MNUM     # debug
+   print("Message number: ", MNUM)     # debug
 
    THGT = len(T)
 
    if LMS_typecode_sig != LMS_typecode_key:
-      print "\nIncorrect typecode. Signature is not valid."
+      print("\nIncorrect typecode. Signature is not valid.")
       os._exit(1)
    else:                            # debug
-      print "\nTypecode matches."     # debug
+      print("\nTypecode matches.")     # debug
 
    candidate = LMS_verify_LMOTS_sig(message, MHWD, MSLC, MPRT, LMID, MSLT, MNUM, S)
    Byteprint("\nCandidate LMOTS pub key: ", candidate)
@@ -186,7 +186,7 @@ def LMS_verify(msgfn, sigfn):
    Byteprint("\nTrue public key: ", LMS_pubkey)
 
    if T1 == LMS_pubkey:
-      print "\nSignature is valid."
+      print("\nSignature is valid.")
    else:
-      print "\nYou're being had."
+      print("\nYou're being had.")
 # ===== END MAIN FUNCTION ===== # ===== END MAIN FUNCTION ===== #
